@@ -3,6 +3,7 @@
  */
 
 import { ENV } from '../utils/env';
+import { uploadAudioToStorage } from '../firebase/services';
 
 // Audio cache to store generated audio blobs
 const audioCache = new Map();
@@ -13,15 +14,16 @@ const audioCache = new Map();
  * @param {string} text - The text to convert to speech
  * @param {string} voice - The voice to use (default: 'onyx')
  * @param {number} speed - The speaking speed (1.0 is normal, higher is faster)
- * @returns {Promise<Blob>} - Audio blob that can be played
+ * @param {string} characterName - The name of the character for storage purposes
+ * @returns {Promise<{blob: Blob, url: string}>} - Audio blob and Firebase URL
  */
-export const textToSpeech = async (text, voice = 'onyx', speed = 1.3) => {
+export const textToSpeech = async (text, voice = 'onyx', speed = 1.3, characterName = null) => {
   // Create a cache key from the text, voice, and speed
   const cacheKey = `${text}|${voice}|${speed}`;
   
   // Check if we already have this audio in the cache
   if (audioCache.has(cacheKey)) {
-    return audioCache.get(cacheKey);
+    return { blob: audioCache.get(cacheKey), url: null };
   }
   
   try {
@@ -51,7 +53,18 @@ export const textToSpeech = async (text, voice = 'onyx', speed = 1.3) => {
     // Cache the audio for future use
     audioCache.set(cacheKey, audioBlob);
     
-    return audioBlob;
+    // If character name is provided, upload to Firebase Storage
+    let firebaseUrl = null;
+    if (characterName) {
+      try {
+        firebaseUrl = await uploadAudioToStorage(audioBlob, characterName);
+      } catch (storageError) {
+        console.error('Firebase Storage upload error:', storageError);
+        // Continue with local blob even if Firebase upload fails
+      }
+    }
+    
+    return { blob: audioBlob, url: firebaseUrl };
   } catch (error) {
     console.error('Text-to-speech error:', error);
     throw error;
@@ -189,7 +202,7 @@ export const prepareGreetingAudio = async (character) => {
   
   try {
     const voice = getVoiceForCharacter(character);
-    const audioBlob = await textToSpeech(character.greeting, voice);
+    const { blob: audioBlob } = await textToSpeech(character.greeting, voice);
     
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);

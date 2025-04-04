@@ -4,6 +4,7 @@ import ChatInterface from './components/ChatInterface';
 import useCharacterAnimation from './hooks/useCharacterAnimation';
 import { generateCharacterResponse, getSuggestionUpdates } from './services/aiService';
 import { textToSpeech, getVoiceForCharacter, prepareGreetingAudio } from './services/audioService';
+import { saveInteraction } from './firebase/services';
 
 // Import all characters from the correct index file
 import allCharacters from './data/characters/index';
@@ -154,10 +155,12 @@ function App() {
       
       // Start preparing the audio as soon as we have the text response
       const voice = getVoiceForCharacter(characterData);
-      const audioPromise = textToSpeech(response, voice);
-      
-      // Prepare the audio in the background while still showing typing
-      const audioBlob = await audioPromise;
+      const { blob: audioBlob, url: firebaseUrl } = await textToSpeech(
+        response, 
+        voice, 
+        1.3, // speed
+        characterData.name // Pass character name for Firebase storage
+      );
       
       // Create the audio element
       const audioUrl = URL.createObjectURL(audioBlob);
@@ -172,6 +175,20 @@ function App() {
       // Store the prepared audio
       setResponseAudio(audio);
       
+      // Save the interaction to Firestore
+      try {
+        await saveInteraction(
+          userMessage,
+          response,
+          audioBlob,
+          characterData.name
+        );
+        console.log('Interaction saved to Firebase');
+      } catch (firebaseError) {
+        console.error('Error saving to Firebase:', firebaseError);
+        // Continue with the conversation even if Firebase saving fails
+      }
+      
       // Now that we have both the text and audio ready, update the UI
       setMessages(prev => [
         ...prev.slice(0, typingIndicatorIndex),
@@ -180,6 +197,7 @@ function App() {
           type: 'character', 
           text: response,
           audio: audio, // Attach the audio to the message
+          firebaseUrl: firebaseUrl, // Store the Firebase URL
           requestStartTime: requestStartTime // Track when the request started
         }
       ]);
