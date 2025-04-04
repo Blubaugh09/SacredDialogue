@@ -16,12 +16,8 @@ const audioCache = new Map();
  * @returns {Promise<Blob>} - Audio blob that can be played
  */
 export const textToSpeech = async (text, voice = 'onyx', speed = 1.3) => {
-  // Add custom instruction for Middle Eastern accent
-  const customInstruction = "Respond in English using an accent or speech pattern similar to a native Hebrew or Arabic speaker from Israel/Palestine.";
-  const textWithInstruction = `${customInstruction}\n\n${text}`;
-  
   // Create a cache key from the text, voice, and speed
-  const cacheKey = `${textWithInstruction}|${voice}|${speed}`;
+  const cacheKey = `${text}|${voice}|${speed}`;
   
   // Check if we already have this audio in the cache
   if (audioCache.has(cacheKey)) {
@@ -37,7 +33,7 @@ export const textToSpeech = async (text, voice = 'onyx', speed = 1.3) => {
       },
       body: JSON.stringify({
         model: 'tts-1',
-        input: textWithInstruction,
+        input: text,
         voice: voice,
         speed: speed // Increase speaking speed
       }),
@@ -176,8 +172,7 @@ export const getVoiceForCharacter = (character) => {
     'Daniel': 'onyx',
     'Esther': 'shimmer',
     'Mary': 'shimmer', // Female voice
-    'Paul': 'echo',
-    'Jesus': 'nova'    // Expressive, compassionate voice
+    'Paul': 'echo'
   };
   
   return voiceMap[character.name] || 'onyx'; // Default to onyx
