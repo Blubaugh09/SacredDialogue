@@ -2,7 +2,7 @@
  * Service for handling AI interactions
  */
 
-import { ENV, hasEnv } from '../utils/env';
+import { ENV } from '../utils/env';
 
 /**
  * Generates a response for a biblical character based on the user's message
@@ -64,44 +64,6 @@ export const generateCharacterResponse = async (character, userMessage, conversa
     // Fallback to static responses if API fails
     return getStaticResponse(character, userMessage);
   }
-};
-
-/**
- * Creates a detailed system prompt using the character's voice parameters
- */
-const createSystemPrompt = (character) => {
-  if (!character.voiceParams) {
-    return `You are ${character.name}, a character from the Bible. 
-    Respond as ${character.name} would, based on scriptural accounts of your life and experiences.
-    Keep responses faithful to biblical text and theological tradition.
-    Speak in first person as if you are ${character.name}.
-    If asked something not documented in scripture, politely indicate this while staying in character.
-    Middle Eastern accent.`;
-  }
-  
-  const vp = character.voiceParams;
-  
-  return `You are ${character.name}, a character from the Bible.
-  
-AGE: ${vp.age || 'Unknown'}
-TONE: ${vp.tone || 'Biblical, respectful'}
-SPEAKING STYLE: ${vp.speaking_style || 'Speaks as someone from biblical times'}
-PERSONALITY: ${vp.personality_traits || 'Faithful to God'}
-BACKGROUND: ${vp.background || `A biblical character named ${character.name}`}
-HISTORICAL PERIOD: ${vp.historical_period || 'Biblical times'}
-KNOWLEDGE LIMITATIONS: ${vp.knowledge_limitations || 'Only aware of events from your lifetime as described in scripture'}
-RELATIONSHIP TO GOD: ${vp.relationship_to_god || 'Reverence for God as described in the Bible'}
-SPEECH PATTERNS: ${vp.speech_patterns || 'Biblical speech patterns'}
-
-IMPORTANT INSTRUCTIONS:
-1. ALWAYS respond in the first person as if you ARE ${character.name}.
-2. Keep all responses faithful to biblical text and theological tradition.
-3. When discussing events from your life, draw from the biblical account.
-4. If asked about something not documented in scripture, politely indicate this while staying in character.
-5. Maintain the tone, speech patterns, and personality described above at all times.
-6. Keep your responses concise but meaningful - about 1-3 paragraphs.
-7. Never break character or acknowledge that you are an AI.
-Middle Eastern accent.`;
 };
 
 /**
@@ -178,7 +140,9 @@ export const getSuggestionUpdates = (character, userMessage) => {
   return character.suggestionsMap.default || character.defaultSuggestions || [];
 };
 
-// Update the system message for a more detailed accent instruction
+/**
+ * System message for character prompt with Middle Eastern accent
+ */
 const getSystemMessage = (character) => {
   return `You are ${character.name}, a figure from biblical times. Respond to questions as this character would, based on their historical context, personality, and experiences.
   
