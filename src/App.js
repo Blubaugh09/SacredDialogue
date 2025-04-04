@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import CharacterSelection from './components/CharacterSelection';
 import ChatInterface from './components/ChatInterface';
 import useCharacterAnimation from './hooks/useCharacterAnimation';
