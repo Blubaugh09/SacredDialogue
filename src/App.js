@@ -143,8 +143,8 @@ function App() {
     }]);
     
     try {
-      // Get response from the AI service
-      const response = await generateCharacterResponse(
+      // Get response from the AI service - now returns an object with response and cache status
+      const { response, fromCache, audioUrl } = await generateCharacterResponse(
         characterData, 
         userMessage, 
         newMessages
@@ -153,41 +153,64 @@ function App() {
       // Generate ID for the response message
       const responseId = generateMessageId();
       
-      // Start preparing the audio as soon as we have the text response
-      const voice = getVoiceForCharacter(characterData);
-      const { blob: audioBlob, url: firebaseUrl } = await textToSpeech(
-        response, 
-        voice, 
-        1.3, // speed
-        characterData.name // Pass character name for Firebase storage
-      );
+      let audio;
+      let firebaseUrl = audioUrl;
       
-      // Create the audio element
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      
-      // Configure audio
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        setResponseAudio(null);
-      };
+      // If we have a cached response with audio URL, use it directly
+      if (fromCache && audioUrl) {
+        // Create audio element from the cached URL
+        audio = new Audio(audioUrl);
+        
+        // Configure audio
+        audio.onended = () => {
+          setResponseAudio(null);
+        };
+        
+        console.log('Using cached audio URL:', audioUrl);
+      } else {
+        // Otherwise generate new audio from the text
+        const voice = getVoiceForCharacter(characterData);
+        
+        // Generate audio for the response
+        const { blob: audioBlob, url: newFirebaseUrl } = await textToSpeech(
+          response, 
+          voice, 
+          1.3, // speed
+          characterData.name // Pass character name for Firebase storage
+        );
+        
+        // Create the audio element
+        const audioUrl = URL.createObjectURL(audioBlob);
+        audio = new Audio(audioUrl);
+        
+        // Configure audio
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          setResponseAudio(null);
+        };
+        
+        // Save the Firebase URL
+        firebaseUrl = newFirebaseUrl;
+        
+        // If this is a new response (not from cache), save it to Firestore
+        if (!fromCache) {
+          try {
+            await saveInteraction(
+              userMessage,
+              response,
+              audioBlob,
+              characterData.name
+            );
+            console.log('New interaction saved to Firebase');
+          } catch (firebaseError) {
+            console.error('Error saving to Firebase:', firebaseError);
+            // Continue with the conversation even if Firebase saving fails
+          }
+        }
+      }
       
       // Store the prepared audio
       setResponseAudio(audio);
-      
-      // Save the interaction to Firestore
-      try {
-        await saveInteraction(
-          userMessage,
-          response,
-          audioBlob,
-          characterData.name
-        );
-        console.log('Interaction saved to Firebase');
-      } catch (firebaseError) {
-        console.error('Error saving to Firebase:', firebaseError);
-        // Continue with the conversation even if Firebase saving fails
-      }
       
       // Now that we have both the text and audio ready, update the UI
       setMessages(prev => [
@@ -198,6 +221,7 @@ function App() {
           text: response,
           audio: audio, // Attach the audio to the message
           firebaseUrl: firebaseUrl, // Store the Firebase URL
+          fromCache: fromCache, // Track if this was from cache
           requestStartTime: requestStartTime // Track when the request started
         }
       ]);
