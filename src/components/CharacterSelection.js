@@ -7,7 +7,7 @@ const CharacterSelection = ({ characters, positions, onSelectCharacter }) => {
     const hasVideo = character.name === 'Abraham' || character.name === 'Mary' || 
                      character.name === 'Esther' || character.name === 'David' || 
                      character.name === 'Paul' || character.name === 'Daniel' || 
-                     character.name === 'Jesus';
+                     character.name === 'Jesus' || character.name === 'Moses';
     
     if (hasVideo) {
       return (
