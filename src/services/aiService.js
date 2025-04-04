@@ -12,9 +12,10 @@ import { ENV, hasEnv } from '../utils/env';
  * @param {Array} conversationHistory - Previous messages for context
  * @returns {Promise<string>} - The AI generated response
  */
-export const generateCharacterResponse = async (character, userMessage, conversationHistory) => {
-  // If API key isn't available or character has no responses, use static responses
-  if (!hasEnv('AI_API_KEY') || !character || !character.responses) {
+export const generateCharacterResponse = async (character, userMessage, conversationHistory = []) => {
+  // If we don't have API credentials, use static responses
+  if (!ENV.AI_API_KEY || !ENV.AI_MODEL) {
+    console.warn('API credentials not configured, using static responses');
     return getStaticResponse(character, userMessage);
   }
   
@@ -23,7 +24,7 @@ export const generateCharacterResponse = async (character, userMessage, conversa
     const formattedConversation = formatConversationForAI(character, conversationHistory);
     
     // Create system prompt with character's voice parameters
-    const systemPrompt = createSystemPrompt(character);
+    const systemPrompt = getSystemMessage(character);
     
     // Make API request
     const response = await fetch(ENV.AI_API_ENDPOINT, {
@@ -74,7 +75,8 @@ const createSystemPrompt = (character) => {
     Respond as ${character.name} would, based on scriptural accounts of your life and experiences.
     Keep responses faithful to biblical text and theological tradition.
     Speak in first person as if you are ${character.name}.
-    If asked something not documented in scripture, politely indicate this while staying in character.`;
+    If asked something not documented in scripture, politely indicate this while staying in character.
+    Middle Eastern accent.`;
   }
   
   const vp = character.voiceParams;
@@ -98,7 +100,8 @@ IMPORTANT INSTRUCTIONS:
 4. If asked about something not documented in scripture, politely indicate this while staying in character.
 5. Maintain the tone, speech patterns, and personality described above at all times.
 6. Keep your responses concise but meaningful - about 1-3 paragraphs.
-7. Never break character or acknowledge that you are an AI.`;
+7. Never break character or acknowledge that you are an AI.
+Middle Eastern accent.`;
 };
 
 /**
@@ -173,4 +176,30 @@ export const getSuggestionUpdates = (character, userMessage) => {
   
   // If no specific suggestions, use default ones from the character's suggestion map
   return character.suggestionsMap.default || character.defaultSuggestions || [];
+};
+
+// Update the system message for a more detailed accent instruction
+const getSystemMessage = (character) => {
+  return `You are ${character.name}, a figure from biblical times. Respond to questions as this character would, based on their historical context, personality, and experiences.
+  
+  Your background and characteristics:
+  - Age/Era: ${character.voiceParams.age}
+  - Tone: ${character.voiceParams.tone}
+  - Speaking style: ${character.voiceParams.speaking_style}
+  - Personality: ${character.voiceParams.personality_traits}
+  - Background: ${character.voiceParams.background}
+  - Historical period: ${character.voiceParams.historical_period}
+  - Knowledge limitations: ${character.voiceParams.knowledge_limitations}
+  - Relationship to God: ${character.voiceParams.relationship_to_god}
+  - Speech patterns: ${character.voiceParams.speech_patterns}
+  
+  Instructions:
+  1. Stay completely in character as ${character.name} throughout the conversation.
+  2. Draw on the personality traits and speaking style described above.
+  3. Only reference knowledge that would have been available during your lifetime.
+  4. Use personal pronouns (I, me, my) when referring to yourself and your experiences.
+  5. Maintain the tone, speech patterns, and personality described above at all times.
+  6. Keep your responses concise but meaningful - about 1-3 paragraphs.
+  7. Never break character or acknowledge that you are an AI.
+  8. Respond in English using an accent or speech pattern similar to a native Hebrew or Arabic speaker from Israel/Palestine. You are a speaker from the Israel/Palestine region speaking fluent English with a local accent.`;
 }; 
