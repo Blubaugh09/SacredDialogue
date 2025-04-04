@@ -7,6 +7,7 @@ import moses from './moses';
 import david from './david';
 import mary from './mary';
 import esther from './esther';
+import paul from './paul';
 
 // Add the rest of your characters here as you implement them
 const characters = [
@@ -15,6 +16,7 @@ const characters = [
   david,
   mary,
   esther,
+  paul,
   // Other characters will be added here
 ];
 
@@ -27,4 +29,5 @@ export {
   david,
   mary,
   esther,
+  paul,
 }; 
