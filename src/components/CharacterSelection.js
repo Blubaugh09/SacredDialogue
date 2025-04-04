@@ -4,7 +4,10 @@ const CharacterSelection = ({ characters, positions, onSelectCharacter }) => {
   // Function to render character avatar (text or video)
   const renderCharacterAvatar = (character) => {
     // Check if video exists for the character
-    const hasVideo = character.name === 'Abraham' || character.name === 'Mary' || character.name === 'Esther' || character.name === 'David' || character.name === 'Paul';
+    const hasVideo = character.name === 'Abraham' || character.name === 'Mary' || 
+                     character.name === 'Esther' || character.name === 'David' || 
+                     character.name === 'Paul' || character.name === 'Daniel' || 
+                     character.name === 'Jesus';
     
     if (hasVideo) {
       return (

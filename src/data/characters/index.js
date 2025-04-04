@@ -8,6 +8,8 @@ import david from './david';
 import mary from './mary';
 import esther from './esther';
 import paul from './paul';
+import daniel from './daniel';
+import jesus from './jesus';
 
 // Add the rest of your characters here as you implement them
 const characters = [
@@ -17,6 +19,8 @@ const characters = [
   mary,
   esther,
   paul,
+  daniel,
+  jesus,
   // Other characters will be added here
 ];
 
@@ -30,4 +34,6 @@ export {
   mary,
   esther,
   paul,
+  daniel,
+  jesus,
 }; 
