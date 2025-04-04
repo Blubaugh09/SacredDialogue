@@ -1,17 +1,21 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore"; 
 import { getStorage } from "firebase/storage";
+import { ENV } from "../utils/env";
 
-// Firebase configuration
+// Firebase configuration from environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyAhqUc_iceq1Mvz69SrPZ8NpX4TJeouajQ",
-  authDomain: "echos-of-logos.firebaseapp.com",
-  projectId: "echos-of-logos",
-  storageBucket: "echos-of-logos.firebasestorage.app",
-  messagingSenderId: "378931027200",
-  appId: "1:378931027200:web:202c72f968419cf862e7e5",
-  measurementId: "G-N2NWSHDX8G"
+  apiKey: ENV.FIREBASE_API_KEY,
+  authDomain: ENV.FIREBASE_AUTH_DOMAIN,
+  projectId: ENV.FIREBASE_PROJECT_ID,
+  storageBucket: ENV.FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: ENV.FIREBASE_MESSAGING_SENDER_ID,
+  appId: ENV.FIREBASE_APP_ID,
+  measurementId: ENV.FIREBASE_MEASUREMENT_ID
 };
+
+// Log whether Firebase config is properly loaded
+console.log(`Firebase config loaded. Project: ${ENV.FIREBASE_PROJECT_ID}`);
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
