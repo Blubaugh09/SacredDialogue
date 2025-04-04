@@ -8,9 +8,6 @@ import { textToSpeech, getVoiceForCharacter, prepareGreetingAudio } from './serv
 // Import all characters from the correct index file
 import allCharacters from './data/characters/index';
 
-// Debug characters
-console.log('Available characters:', allCharacters.map(char => ({ id: char.id, name: char.name })));
-
 // Cache for character greeting audio
 const greetingAudioCache = new Map();
 
@@ -213,7 +210,7 @@ function App() {
     
     // Auto-send after a short delay to mimic clicking
     setTimeout(() => {
-      handleSendMessage();
+      handleSendMessage(suggestion); // Pass suggestion directly to avoid async state issues
     }, 100);
   };
   
@@ -234,13 +231,6 @@ function App() {
   
   return (
     <div className="flex flex-col h-screen bg-slate-100">
-      {/* Debug section */}
-      <div style={{position: 'fixed', top: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.7)', color: 'white', padding: '10px', zIndex: 1000, fontSize: '10px'}}>
-        <p>Characters: {allCharacters.map(c => c.name).join(', ')}</p>
-        <p>Has Jesus: {allCharacters.some(c => c.name === 'Jesus').toString()}</p>
-        <p>Jesus index: {allCharacters.findIndex(c => c.name === 'Jesus')}</p>
-      </div>
-    
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-white p-4 rounded-lg shadow-lg">
