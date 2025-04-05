@@ -321,23 +321,16 @@ const ChatInterface = ({
     <div 
       className="flex flex-col h-screen"
       style={{ 
-        backgroundImage: 'url("/papyrus-texture.jpg")', 
+        backgroundImage: 'url("assets/desert-bg.png")', 
         backgroundRepeat: 'repeat',
         backgroundSize: '400px'
       }}
     >
       <div className="bg-amber-900 text-amber-50 shadow-md p-4 flex items-center">
-        <div 
-          className="w-12 h-12 rounded-full flex items-center justify-center mr-3 border-2 border-amber-200 shadow-inner"
-          style={{ backgroundColor: selectedCharacter.color }}
-        >
-          <div className="text-white text-lg font-bold">
-            {selectedCharacter.name.charAt(0)}
-          </div>
-        </div>
+      
         <div>
-          <h2 className="font-semibold text-xl">{selectedCharacter.name}</h2>
-          <p className="text-xs text-amber-200">Figure from the Ancient Scriptures</p>
+          <h2 className="font-semibold text-xl text-amber-200">{selectedCharacter.name}</h2>
+         
           {activeStory && (
             <p className="text-xs text-amber-100 mt-1 italic">
               <span className="mr-1">•</span> {activeStory.title}
@@ -454,15 +447,7 @@ const ChatInterface = ({
               {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
             </button>
             
-            {/* Replay button */}
-            <button
-              onClick={handleReplayMessage}
-              disabled={!messages.some(m => m.type === 'character' && m.audio) || isRecording || isProcessingSpeech}
-              className="ml-2 p-2 rounded-full bg-amber-200 hover:bg-amber-300 text-amber-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title="Hear again the last words"
-            >
-              <Repeat size={18} />
-            </button>
+            
             
             <button
               onClick={() => handleSendMessage()}

@@ -150,7 +150,7 @@ const StoryMode = ({
       <div 
         className="bg-amber-50 rounded-lg shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
         style={{ 
-          backgroundImage: 'url("/papyrus-texture.jpg")', 
+          backgroundImage: 'url("assets/desert-bg.png")', 
           backgroundRepeat: 'repeat',
           backgroundSize: '400px'
         }}

@@ -54,7 +54,7 @@ const CharacterSelection = ({ characters, positions, onSelectCharacter }) => {
     <div 
       className="flex-1 p-6 relative min-h-screen"
       style={{
-        backgroundImage: 'url("/assets/desert-bg.jpg")',
+        backgroundImage: 'url("/assets/desert-bg.png")',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
@@ -84,7 +84,7 @@ const CharacterSelection = ({ characters, positions, onSelectCharacter }) => {
               >
                 {renderCharacterAvatar(character)}
                 <span className="text-lg font-semibold text-amber-900 group-hover:text-amber-700">{character.name}</span>
-                <span className="text-xs text-amber-700 italic mt-1 opacity-80 group-hover:opacity-100">Speak with {character.name}</span>
+                
               </div>
             ))}
           </div>
