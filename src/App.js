@@ -194,8 +194,9 @@ function App() {
         
         try {
           // Fetch the audio from Firebase and convert to blob first
+          console.log('Attempting to fetch audio blob from Firebase URL');
           const audioBlob = await fetchAudioAsBlob(audioUrl);
-          console.log('Successfully fetched audio blob, creating player');
+          console.log('Successfully fetched audio blob, creating player with size:', audioBlob.size);
           
           // Create audio player from blob
           audio = createReliableAudioPlayer(audioBlob, () => {
@@ -204,25 +205,33 @@ function App() {
           
           // Ensure the audio is loaded
           await audio.load();
+          console.log('Audio loaded successfully');
           
         } catch (audioError) {
           console.warn('Failed to use cached audio, generating new audio:', audioError);
           
           // Fall back to generating new audio
-          const voice = getVoiceForCharacter(characterData);
-          const { blob: audioBlob, url: newFirebaseUrl } = await textToSpeech(
-            response, 
-            voice, 
-            1.3,
-            characterData.name
-          );
-          
-          // Create audio player from freshly generated blob
-          audio = createReliableAudioPlayer(audioBlob, () => {
-            setResponseAudio(null);
-          });
-          
-          firebaseUrl = newFirebaseUrl;
+          try {
+            const voice = getVoiceForCharacter(characterData);
+            const { blob: audioBlob, url: newFirebaseUrl } = await textToSpeech(
+              response, 
+              voice, 
+              1.3,
+              characterData.name
+            );
+            
+            console.log('Generated new audio successfully');
+            
+            // Create audio player from freshly generated blob
+            audio = createReliableAudioPlayer(audioBlob, () => {
+              setResponseAudio(null);
+            });
+            
+            firebaseUrl = newFirebaseUrl;
+          } catch (fallbackError) {
+            console.error('Failed to generate fallback audio:', fallbackError);
+            // Continue without audio if we can't create fallback
+          }
         }
       } else {
         // Otherwise generate new audio from the text

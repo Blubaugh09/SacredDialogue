@@ -1,6 +1,6 @@
 import { db, storage } from './config';
 import { collection, serverTimestamp, query, limit, setDoc, doc, getDoc, getDocs } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, getBlob } from 'firebase/storage';
 import crypto from 'crypto-js';
 
 /**
@@ -154,5 +154,43 @@ export const findExistingResponse = async (question, characterName) => {
   } catch (error) {
     console.error("Error finding existing response:", error);
     return null; // Return null instead of throwing to ensure API call still works as fallback
+  }
+};
+
+/**
+ * Get audio blob directly from Firebase Storage using SDK
+ * This avoids CORS issues with direct URL access
+ * 
+ * @param {string} url - Firebase Storage URL 
+ * @returns {Promise<Blob>} - The audio blob
+ */
+export const getAudioBlobFromFirebase = async (url) => {
+  try {
+    console.log('Getting audio blob directly from Firebase Storage');
+    
+    // Extract the path from the Firebase Storage URL
+    // URL format: https://firebasestorage.googleapis.com/v0/b/[bucket]/o/[path]?alt=media&token=[token]
+    const urlObj = new URL(url);
+    let path = urlObj.pathname.split('/o/')[1];
+    
+    // URL decode the path
+    if (path) {
+      path = decodeURIComponent(path);
+      console.log('Extracted path from URL:', path);
+      
+      // Get a reference to the file in Firebase Storage
+      const storageRef = ref(storage, path);
+      
+      // Get the blob directly using the Firebase Storage SDK
+      const blob = await getBlob(storageRef);
+      console.log('Successfully got blob from Firebase Storage, size:', blob.size);
+      
+      return blob;
+    } else {
+      throw new Error('Could not parse Firebase Storage path from URL');
+    }
+  } catch (error) {
+    console.error('Error getting blob from Firebase:', error);
+    throw error;
   }
 }; 

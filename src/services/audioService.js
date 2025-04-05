@@ -3,7 +3,7 @@
  */
 
 import { ENV } from '../utils/env';
-import { uploadAudioToStorage } from '../firebase/services';
+import { uploadAudioToStorage, getAudioBlobFromFirebase } from '../firebase/services';
 
 // Audio cache to store generated audio blobs
 const audioCache = new Map();
@@ -230,7 +230,14 @@ export const fetchAudioAsBlob = async (url) => {
   try {
     console.log('Attempting to fetch audio from URL:', url);
     
-    // Add a cache-busting parameter to the URL to prevent caching issues
+    // Check if it's a Firebase Storage URL
+    if (url.includes('firebasestorage.googleapis.com')) {
+      console.log('Detected Firebase Storage URL, using SDK to fetch');
+      // Use Firebase SDK directly to avoid CORS issues
+      return await getAudioBlobFromFirebase(url);
+    }
+    
+    // For non-Firebase URLs, use regular fetch with cache busting
     const cacheBustUrl = `${url}&_cb=${Date.now()}`;
     
     const response = await fetch(cacheBustUrl, {
