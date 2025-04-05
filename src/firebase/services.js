@@ -1,6 +1,20 @@
 import { db, storage } from './config';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit, setDoc, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import crypto from 'crypto-js';
+
+/**
+ * Create a consistent ID for a question-character pair
+ * @param {string} question The normalized question
+ * @param {string} characterName The character name
+ * @returns {string} A hash ID for this question-character combination
+ */
+const createQuestionId = (question, characterName) => {
+  // Normalize the question (lowercase, remove extra spaces)
+  const normalizedQuestion = question.toLowerCase().trim();
+  // Create a hash of the question and character name for consistent IDs
+  return crypto.SHA256(normalizedQuestion + '|' + characterName).toString().substring(0, 20);
+};
 
 /**
  * Save a question and response to Firestore, including the audio URL
@@ -15,19 +29,27 @@ export const saveInteraction = async (question, response, audioBlob, characterNa
     // First upload the audio to Firebase Storage
     const audioURL = await uploadAudioToStorage(audioBlob, characterName);
     
-    // Then save the interaction data to Firestore
-    const docRef = await addDoc(collection(db, "interactions"), {
-      question,
+    // Create a unique ID based on question content and character
+    const questionId = createQuestionId(question, characterName);
+    
+    // We'll store interactions in a specific subcollection for better organization
+    const docRef = doc(db, "characters", characterName, "questions", questionId);
+    
+    // Save with setDoc instead of addDoc to use our custom ID
+    await setDoc(docRef, {
+      question: question.toLowerCase().trim(), // Store normalized question
+      originalQuestion: question, // Also store original for display purposes
       response,
       audioURL,
       characterName,
-      timestamp: serverTimestamp()
+      timestamp: serverTimestamp(),
+      accessCount: 1 // Track how many times this Q&A has been accessed
     });
     
-    console.log("Interaction saved with ID: ", docRef.id);
-    return docRef.id;
+    console.log("Interaction saved with ID:", questionId);
+    return questionId;
   } catch (error) {
-    console.error("Error saving interaction: ", error);
+    console.error("Error saving interaction:", error);
     throw error;
   }
 };
@@ -53,10 +75,10 @@ export const uploadAudioToStorage = async (audioBlob, characterName) => {
     // Get the download URL
     const downloadURL = await getDownloadURL(snapshot.ref);
     
-    console.log("Audio uploaded successfully, URL: ", downloadURL);
+    console.log("Audio uploaded successfully, URL:", downloadURL);
     return downloadURL;
   } catch (error) {
-    console.error("Error uploading audio: ", error);
+    console.error("Error uploading audio:", error);
     throw error;
   }
 };
@@ -69,35 +91,63 @@ export const uploadAudioToStorage = async (audioBlob, characterName) => {
  */
 export const findExistingResponse = async (question, characterName) => {
   try {
-    // Normalize the question (lowercase, remove extra spaces)
+    // Normalize the question and generate a consistent ID
     const normalizedQuestion = question.toLowerCase().trim();
+    const questionId = createQuestionId(normalizedQuestion, characterName);
     
-    // Query Firestore for exact matches first
-    const exactMatchesQuery = query(
-      collection(db, "interactions"),
-      where("characterName", "==", characterName),
-      where("question", "==", normalizedQuestion),
-      orderBy("timestamp", "desc"),
-      limit(1)
-    );
+    // Try to get the document directly by ID first (most efficient)
+    const docRef = doc(db, "characters", characterName, "questions", questionId);
+    const docSnap = await getDoc(docRef);
     
-    const exactMatchesSnapshot = await getDocs(exactMatchesQuery);
-    
-    // If we found an exact match, return it
-    if (!exactMatchesSnapshot.empty) {
-      const doc = exactMatchesSnapshot.docs[0];
+    if (docSnap.exists()) {
       console.log("Found exact match for question:", normalizedQuestion);
+      
+      // Update access count
+      await setDoc(docRef, {
+        accessCount: (docSnap.data().accessCount || 0) + 1
+      }, { merge: true });
+      
       return {
-        id: doc.id,
-        ...doc.data()
+        id: docSnap.id,
+        ...docSnap.data()
       };
     }
     
-    // If no exact match, we could implement a more fuzzy search here
-    // For example, checking if the query contains similar keywords
-    // This would be more complex and might require a specialized search solution
-    // For now, we'll just return null if no exact match is found
+    // If no direct match by ID, try a more flexible query
+    // This can handle slight variations in questions
+    const questionsRef = collection(db, "characters", characterName, "questions");
+    const alternativeQuery = query(
+      questionsRef,
+      where("characterName", "==", characterName),
+      orderBy("timestamp", "desc"),
+      limit(10)
+    );
     
+    const querySnapshot = await getDocs(alternativeQuery);
+    
+    // Look for similar questions in the results
+    // We could implement a more sophisticated text similarity algorithm here
+    for (const doc of querySnapshot.docs) {
+      const data = doc.data();
+      if (data.question && 
+        (data.question.includes(normalizedQuestion) || 
+         normalizedQuestion.includes(data.question))) {
+        
+        console.log("Found similar question match:", data.question);
+        
+        // Update access count
+        await setDoc(doc.ref, {
+          accessCount: (data.accessCount || 0) + 1
+        }, { merge: true });
+        
+        return {
+          id: doc.id,
+          ...data
+        };
+      }
+    }
+    
+    // No match found
     return null;
   } catch (error) {
     console.error("Error finding existing response:", error);
