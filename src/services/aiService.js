@@ -60,6 +60,7 @@ export const generateCharacterResponse = async (character, userMessage, conversa
 /**
  * Creates a detailed system prompt using the character's voice parameters
  */
+// eslint-disable-next-line no-unused-vars
 const createSystemPrompt = (character) => {
   if (!character.voiceParams) {
     return `You are ${character.name}, a character from the Bible. 
@@ -96,6 +97,7 @@ IMPORTANT INSTRUCTIONS:
 /**
  * Formats conversation history for the AI API
  */
+// eslint-disable-next-line no-unused-vars
 const formatConversationForAI = (character, history) => {
   return history
     .filter(message => !message.isTyping) // Filter out typing indicators
@@ -108,6 +110,7 @@ const formatConversationForAI = (character, history) => {
 /**
  * Gets a static predefined response based on the user's message
  */
+// eslint-disable-next-line no-unused-vars
 const getStaticResponse = (character, userMessage) => {
   // If no character data is available, return a generic response
   if (!character || !character.keywords || !character.responses) {
