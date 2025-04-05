@@ -16,6 +16,38 @@ const greetingAudioCache = new Map();
 let messageIdCounter = 0;
 const generateMessageId = () => `msg_${++messageIdCounter}`;
 
+// Add this new function to create a reliable audio player
+const createReliableAudioPlayer = (audioBlob, onEnded) => {
+  // Create a clean blob URL for this audio
+  const blobUrl = URL.createObjectURL(audioBlob);
+  
+  // Create a new audio element
+  const audio = new Audio();
+  
+  // Set up clean-up for when playback ends
+  audio.onended = () => {
+    console.log('Audio playback ended, cleaning up blob URL');
+    URL.revokeObjectURL(blobUrl);
+    if (onEnded) onEnded();
+  };
+  
+  // Set up error handler
+  audio.onerror = (e) => {
+    console.error('Audio playback error:', e);
+    URL.revokeObjectURL(blobUrl);
+  };
+  
+  // Configure audio element
+  audio.src = blobUrl;
+  audio.type = 'audio/mpeg';
+  
+  // Set CORS attributes even for blob URLs (as a precaution)
+  audio.crossOrigin = 'anonymous';
+  
+  // Return the configured audio element
+  return audio;
+};
+
 function App() {
   const [selectedCharacter, setSelectedCharacter] = useState(null);
   const [characterData, setCharacterData] = useState(null);
@@ -163,52 +195,14 @@ function App() {
         try {
           // Fetch the audio from Firebase and convert to blob first
           const audioBlob = await fetchAudioAsBlob(audioUrl);
+          console.log('Successfully fetched audio blob, creating player');
           
-          // Create audio from blob URL instead of directly from Firebase URL
-          const blobUrl = URL.createObjectURL(audioBlob);
-          audio = new Audio(blobUrl);
-          
-          // Set up error handler
-          audio.onerror = async (e) => {
-            console.error('Error playing cached audio (blob):', e);
-            
-            // Fall back to generating new audio
-            const voice = getVoiceForCharacter(characterData);
-            const { blob: newAudioBlob, url: freshUrl } = await textToSpeech(
-              response, 
-              voice, 
-              1.3,
-              characterData.name
-            );
-            
-            // Create a new audio element with the blob
-            const newBlobUrl = URL.createObjectURL(newAudioBlob);
-            const newAudio = new Audio(newBlobUrl);
-            newAudio.onended = () => {
-              URL.revokeObjectURL(newBlobUrl);
-              setResponseAudio(null);
-            };
-            
-            // Replace the audio
-            setResponseAudio(newAudio);
-            
-            // Update the message with the new audio
-            setMessages(prev => 
-              prev.map(msg => 
-                msg.id === responseId 
-                  ? {...msg, audio: newAudio, firebaseUrl: freshUrl} 
-                  : msg
-              )
-            );
-          };
-          
-          // Set up ended handler to clean up blob URL
-          audio.onended = () => {
-            URL.revokeObjectURL(blobUrl);
+          // Create audio player from blob
+          audio = createReliableAudioPlayer(audioBlob, () => {
             setResponseAudio(null);
-          };
+          });
           
-          // Explicitly load the audio
+          // Ensure the audio is loaded
           await audio.load();
           
         } catch (audioError) {
@@ -223,13 +217,10 @@ function App() {
             characterData.name
           );
           
-          const blobUrl = URL.createObjectURL(audioBlob);
-          audio = new Audio(blobUrl);
-          
-          audio.onended = () => {
-            URL.revokeObjectURL(blobUrl);
+          // Create audio player from freshly generated blob
+          audio = createReliableAudioPlayer(audioBlob, () => {
             setResponseAudio(null);
-          };
+          });
           
           firebaseUrl = newFirebaseUrl;
         }

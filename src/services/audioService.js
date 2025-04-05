@@ -228,10 +228,19 @@ export const prepareGreetingAudio = async (character) => {
  */
 export const fetchAudioAsBlob = async (url) => {
   try {
-    const response = await fetch(url, {
+    console.log('Attempting to fetch audio from URL:', url);
+    
+    // Add a cache-busting parameter to the URL to prevent caching issues
+    const cacheBustUrl = `${url}&_cb=${Date.now()}`;
+    
+    const response = await fetch(cacheBustUrl, {
       method: 'GET',
       mode: 'cors',
       cache: 'no-cache',
+      credentials: 'same-origin',
+      headers: {
+        'Accept': 'audio/mpeg, audio/*;q=0.8'
+      },
     });
     
     if (!response.ok) {
@@ -239,6 +248,7 @@ export const fetchAudioAsBlob = async (url) => {
     }
     
     const blob = await response.blob();
+    console.log('Successfully fetched audio blob, size:', blob.size, 'bytes, type:', blob.type);
     return blob;
   } catch (error) {
     console.error('Error fetching audio as blob:', error);
