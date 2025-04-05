@@ -29,8 +29,8 @@ export const ENV = {
   APP_NAME: getEnv('APP_NAME', 'Biblical Character Dialogue'),
 };
 
-// Check if an environment variable exists
-export const hasEnv = (key) => {
+// Check if an environment variable exists in the ENV object
+export const hasEnvValue = (key) => {
   return ENV[key] && ENV[key].length > 0;
 };
 

@@ -2,7 +2,7 @@
  * Service for handling AI interactions
  */
 
-import { ENV, hasEnv, getApiEndpoint, getApiKey, getModel } from '../utils/env';
+import { ENV, hasEnv, getApiEndpoint, getApiKey, getModel, hasEnvValue } from '../utils/env';
 
 /**
  * Generates a response for a biblical character based on the user's message
