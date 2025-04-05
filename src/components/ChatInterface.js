@@ -236,27 +236,7 @@ const ChatInterface = ({
     setIsRecording(false);
   };
   
-  // Handle replay of the last message
-  const handleReplayMessage = () => {
-    if (!messages.length) return;
-    
-    // Find the last character message with audio
-    const lastMessageWithAudio = [...messages].reverse().find(
-      msg => msg.type === 'character' && msg.audio
-    );
-    
-    if (lastMessageWithAudio?.audio) {
-      // Reset the played status for this message
-      setPlayedMessages(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(lastMessageWithAudio.text);
-        return newSet;
-      });
-      
-      // Set user interacted to true - this helps with future autoplay
-      setUserInteracted(true);
-    }
-  };
+
   
   // Toggle video display
   const toggleVideo = () => {
