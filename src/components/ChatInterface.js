@@ -103,13 +103,50 @@ const ChatInterface = ({
       
       // Play the audio - handle mobile autoplay restrictions
       const playAudio = () => {
+        // Set userInteracted flag to true to help with future autoplay attempts
+        setUserInteracted(true);
+        
+        // Reset any errors on the audio element
+        audio.onerror = null;
+        
+        // Add error handler for audio loading issues
+        audio.onerror = (e) => {
+          console.error('Audio loading error:', e);
+          
+          // We don't remove from played messages - this allows the autoplay
+          // to try again after user interaction
+          setPlayedMessages(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(lastMessageWithAudio.text);
+            return newSet;
+          });
+        };
+        
         const playPromise = audio.play();
         
         if (playPromise !== undefined) {
           playPromise.catch(error => {
             console.error('AutoPlay failed:', error);
-            // If autoplay fails (e.g., on mobile), we'll provide visual feedback
-            // to prompt user to interact
+            
+            // If on mobile, this is likely due to autoplay restrictions
+            if (error.name === 'NotAllowedError') {
+              console.log('Autoplay not allowed, waiting for user interaction');
+            } else if (error.name === 'NotSupportedError') {
+              console.error('Audio format not supported or source not found');
+              
+              // Try to reload the audio with a different approach if it's from Firebase
+              if (lastMessageWithAudio.firebaseUrl) {
+                console.log('Trying to reload audio from Firebase URL');
+                
+                const newAudio = new Audio();
+                newAudio.crossOrigin = "anonymous";
+                newAudio.src = lastMessageWithAudio.firebaseUrl;
+                
+                // Replace the audio in the message
+                lastMessageWithAudio.audio = newAudio;
+                setCurrentAudio(newAudio);
+              }
+            }
             
             // We don't remove from played messages - this allows the autoplay
             // to try again after user interaction

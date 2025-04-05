@@ -158,15 +158,77 @@ function App() {
       
       // If we have a cached response with audio URL, use it directly
       if (fromCache && audioUrl) {
-        // Create audio element from the cached URL
-        audio = new Audio(audioUrl);
-        
-        // Configure audio
-        audio.onended = () => {
-          setResponseAudio(null);
-        };
-        
         console.log('Using cached audio URL:', audioUrl);
+        
+        try {
+          // Create audio element from the cached URL with error handling
+          audio = new Audio();
+          
+          // Set up error handler before setting src
+          audio.onerror = async (e) => {
+            console.error('Error loading cached audio, generating new audio:', e);
+            
+            // Fall back to generating new audio
+            const voice = getVoiceForCharacter(characterData);
+            const { blob: audioBlob, url: freshUrl } = await textToSpeech(
+              response, 
+              voice, 
+              1.3,
+              characterData.name
+            );
+            
+            // Create a new audio element with the blob
+            const blobUrl = URL.createObjectURL(audioBlob);
+            const newAudio = new Audio(blobUrl);
+            newAudio.onended = () => {
+              URL.revokeObjectURL(blobUrl);
+              setResponseAudio(null);
+            };
+            
+            // Replace the audio
+            setResponseAudio(newAudio);
+            
+            // Update the message with the new audio
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === responseId 
+                  ? {...msg, audio: newAudio, firebaseUrl: freshUrl} 
+                  : msg
+              )
+            );
+          };
+          
+          // Set up ended handler
+          audio.onended = () => {
+            setResponseAudio(null);
+          };
+          
+          // Now set the src to trigger loading
+          audio.crossOrigin = "anonymous";
+          audio.src = audioUrl;
+          await audio.load(); // Explicitly load the audio
+        } catch (audioError) {
+          console.warn('Failed to use cached audio:', audioError);
+          
+          // Fall back to generating new audio
+          const voice = getVoiceForCharacter(characterData);
+          const { blob: audioBlob, url: newFirebaseUrl } = await textToSpeech(
+            response, 
+            voice, 
+            1.3,
+            characterData.name
+          );
+          
+          const blobUrl = URL.createObjectURL(audioBlob);
+          audio = new Audio(blobUrl);
+          
+          audio.onended = () => {
+            URL.revokeObjectURL(blobUrl);
+            setResponseAudio(null);
+          };
+          
+          firebaseUrl = newFirebaseUrl;
+        }
       } else {
         // Otherwise generate new audio from the text
         const voice = getVoiceForCharacter(characterData);

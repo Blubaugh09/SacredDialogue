@@ -1,5 +1,5 @@
 import { db, storage } from './config';
-import { collection, addDoc, serverTimestamp, query, where, getDocs, orderBy, limit, setDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, serverTimestamp, query, where, getDocs, orderBy, limit, setDoc, doc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import crypto from 'crypto-js';
 
@@ -31,6 +31,10 @@ export const saveInteraction = async (question, response, audioBlob, characterNa
     
     // Create a unique ID based on question content and character
     const questionId = createQuestionId(question, characterName);
+    
+    // First ensure the character document exists
+    const characterDocRef = doc(db, "characters", characterName);
+    await setDoc(characterDocRef, { name: characterName }, { merge: true });
     
     // We'll store interactions in a specific subcollection for better organization
     const docRef = doc(db, "characters", characterName, "questions", questionId);
@@ -113,17 +117,15 @@ export const findExistingResponse = async (question, characterName) => {
       };
     }
     
-    // If no direct match by ID, try a more flexible query
-    // This can handle slight variations in questions
+    // If no direct match by ID, try a simplified query approach
+    // This avoids index requirements by not using orderBy
     const questionsRef = collection(db, "characters", characterName, "questions");
-    const alternativeQuery = query(
+    const simpleQuery = query(
       questionsRef,
-      where("characterName", "==", characterName),
-      orderBy("timestamp", "desc"),
       limit(10)
     );
     
-    const querySnapshot = await getDocs(alternativeQuery);
+    const querySnapshot = await getDocs(simpleQuery);
     
     // Look for similar questions in the results
     // We could implement a more sophisticated text similarity algorithm here
