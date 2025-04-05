@@ -1,5 +1,5 @@
 import { db, storage } from './config';
-import { collection, serverTimestamp, query, where, getDocs, orderBy, limit, setDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, serverTimestamp, query, limit, setDoc, doc, getDoc, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import crypto from 'crypto-js';
 

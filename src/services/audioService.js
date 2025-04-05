@@ -217,4 +217,31 @@ export const prepareGreetingAudio = async (character) => {
     console.error('Failed to prepare greeting audio:', error);
     return null;
   }
+};
+
+/**
+ * Fetches an audio file from a URL and converts it to a blob
+ * This helps overcome CORS and format issues with Firebase Storage URLs
+ * 
+ * @param {string} url - The URL of the audio file
+ * @returns {Promise<Blob>} - Audio blob that can be played
+ */
+export const fetchAudioAsBlob = async (url) => {
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-cache',
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    return blob;
+  } catch (error) {
+    console.error('Error fetching audio as blob:', error);
+    throw error;
+  }
 }; 

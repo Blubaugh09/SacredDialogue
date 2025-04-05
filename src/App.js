@@ -3,7 +3,7 @@ import CharacterSelection from './components/CharacterSelection';
 import ChatInterface from './components/ChatInterface';
 import useCharacterAnimation from './hooks/useCharacterAnimation';
 import { generateCharacterResponse, getSuggestionUpdates } from './services/aiService';
-import { textToSpeech, getVoiceForCharacter, prepareGreetingAudio } from './services/audioService';
+import { textToSpeech, getVoiceForCharacter, prepareGreetingAudio, fetchAudioAsBlob } from './services/audioService';
 import { saveInteraction } from './firebase/services';
 
 // Import all characters from the correct index file
@@ -161,16 +161,20 @@ function App() {
         console.log('Using cached audio URL:', audioUrl);
         
         try {
-          // Create audio element from the cached URL with error handling
-          audio = new Audio();
+          // Fetch the audio from Firebase and convert to blob first
+          const audioBlob = await fetchAudioAsBlob(audioUrl);
           
-          // Set up error handler before setting src
+          // Create audio from blob URL instead of directly from Firebase URL
+          const blobUrl = URL.createObjectURL(audioBlob);
+          audio = new Audio(blobUrl);
+          
+          // Set up error handler
           audio.onerror = async (e) => {
-            console.error('Error loading cached audio, generating new audio:', e);
+            console.error('Error playing cached audio (blob):', e);
             
             // Fall back to generating new audio
             const voice = getVoiceForCharacter(characterData);
-            const { blob: audioBlob, url: freshUrl } = await textToSpeech(
+            const { blob: newAudioBlob, url: freshUrl } = await textToSpeech(
               response, 
               voice, 
               1.3,
@@ -178,10 +182,10 @@ function App() {
             );
             
             // Create a new audio element with the blob
-            const blobUrl = URL.createObjectURL(audioBlob);
-            const newAudio = new Audio(blobUrl);
+            const newBlobUrl = URL.createObjectURL(newAudioBlob);
+            const newAudio = new Audio(newBlobUrl);
             newAudio.onended = () => {
-              URL.revokeObjectURL(blobUrl);
+              URL.revokeObjectURL(newBlobUrl);
               setResponseAudio(null);
             };
             
@@ -198,17 +202,17 @@ function App() {
             );
           };
           
-          // Set up ended handler
+          // Set up ended handler to clean up blob URL
           audio.onended = () => {
+            URL.revokeObjectURL(blobUrl);
             setResponseAudio(null);
           };
           
-          // Now set the src to trigger loading
-          audio.crossOrigin = "anonymous";
-          audio.src = audioUrl;
-          await audio.load(); // Explicitly load the audio
+          // Explicitly load the audio
+          await audio.load();
+          
         } catch (audioError) {
-          console.warn('Failed to use cached audio:', audioError);
+          console.warn('Failed to use cached audio, generating new audio:', audioError);
           
           // Fall back to generating new audio
           const voice = getVoiceForCharacter(characterData);
