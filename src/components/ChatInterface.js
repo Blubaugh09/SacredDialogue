@@ -105,22 +105,62 @@ const ChatInterface = ({
       
       // Play the audio - handle mobile autoplay restrictions
       const playAudio = () => {
-        const playPromise = audio.play();
+        if (!audio || !audio.src) {
+          console.error('Invalid audio source', audio);
+          return;
+        }
         
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.error('AutoPlay failed:', error);
-            // If autoplay fails (e.g., on mobile), we'll provide visual feedback
-            // to prompt user to interact
+        try {
+          // Check if the audio is valid and has a source before playing
+          if (audio.readyState === 0) {
+            console.log('Audio not ready yet, waiting for loadeddata event');
             
-            // We don't remove from played messages - this allows the autoplay
-            // to try again after user interaction
-            setPlayedMessages(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(lastMessageWithAudio.text);
-              return newSet;
+            // Add event listener to play when loaded
+            audio.addEventListener('loadeddata', () => {
+              console.log('Audio loaded, attempting to play');
+              attemptPlay();
+            }, { once: true });
+            
+            // Set a timeout in case the loading takes too long
+            setTimeout(() => {
+              if (audio.readyState === 0) {
+                console.error('Audio failed to load within timeout');
+                
+                // Mark as not played so UI can be updated
+                setPlayedMessages(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(lastMessageWithAudio.text);
+                  return newSet;
+                });
+              }
+            }, 5000); // 5 second timeout
+          } else {
+            // Audio is ready to play
+            attemptPlay();
+          }
+        } catch (error) {
+          console.error('Error setting up audio playback:', error);
+        }
+        
+        // Helper function to attempt playing with error handling
+        function attemptPlay() {
+          const playPromise = audio.play();
+          
+          if (playPromise !== undefined) {
+            playPromise.catch(error => {
+              console.error('AutoPlay failed:', error);
+              // If autoplay fails (e.g., on mobile), we'll provide visual feedback
+              // to prompt user to interact
+              
+              // We don't remove from played messages - this allows the autoplay
+              // to try again after user interaction
+              setPlayedMessages(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(lastMessageWithAudio.text);
+                return newSet;
+              });
             });
-          });
+          }
         }
       };
       
@@ -245,23 +285,88 @@ const ChatInterface = ({
   
   // Play a specific message audio
   const playMessageAudio = (message) => {
-    if (!message.audio) return;
-    
-    // Stop any currently playing audio
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.onended = null;
+    if (!message || !message.audio) {
+      console.error('Attempted to play message without audio:', message);
+      return;
     }
     
-    // Reset the played status for this message
-    setPlayedMessages(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(message.text);
-      return newSet;
-    });
-    
-    // Set user interacted to true
-    setUserInteracted(true);
+    try {
+      // Stop any currently playing audio
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.onended = null;
+      }
+      
+      const audio = message.audio;
+      
+      // Check if the source is from a Firebase Storage URL
+      if (audio.src.includes('firebasestorage.googleapis.com')) {
+        console.log('Firebase storage URL detected in message audio, adding CORS parameters');
+        // Add token and alt parameter if not present
+        if (!audio.src.includes('alt=media')) {
+          const separator = audio.src.includes('?') ? '&' : '?';
+          audio.src = `${audio.src}${separator}alt=media`;
+        }
+      }
+      
+      // Set this as the current audio
+      setCurrentAudio(audio);
+      
+      // Add error handling to the audio element
+      audio.onerror = (e) => {
+        console.error('Error playing message audio:', e);
+        alert('Sorry, there was an error playing the audio. Please try again.');
+      };
+      
+      // Check if the audio is valid and has a source before playing
+      if (audio.readyState === 0) {
+        console.log('Message audio not ready yet, waiting for loadeddata event');
+        
+        // Add event listener to play when loaded
+        audio.addEventListener('loadeddata', () => {
+          console.log('Message audio loaded, attempting to play');
+          attemptPlay();
+        }, { once: true });
+        
+        // Set a timeout in case the loading takes too long
+        setTimeout(() => {
+          if (audio.readyState === 0) {
+            console.error('Message audio failed to load within timeout');
+          }
+        }, 5000); // 5 second timeout
+      } else {
+        // Audio is ready to play
+        attemptPlay();
+      }
+      
+      // Helper function to attempt playing with error handling
+      function attemptPlay() {
+        const playPromise = audio.play();
+        
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error('Failed to play message audio:', error);
+            
+            // If this is the first interaction, it might be an autoplay restriction
+            if (!userInteracted) {
+              alert('Please interact with the page to enable audio playback.');
+            }
+          });
+        }
+      }
+      
+      // Reset the played status for this message
+      setPlayedMessages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(message.text);
+        return newSet;
+      });
+      
+      // Set user interacted to true
+      setUserInteracted(true);
+    } catch (error) {
+      console.error('Error in playMessageAudio:', error);
+    }
   };
   
   // Render a typing indicator or the message text
@@ -427,8 +532,6 @@ const ChatInterface = ({
               {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
             </button>
             
-            
-            
             <button
               onClick={() => handleSendMessage()}
               disabled={!inputValue.trim() || messages.some(m => m.isTyping) || isRecording || isProcessingSpeech}
@@ -459,4 +562,4 @@ const ChatInterface = ({
   );
 };
 
-export default ChatInterface; 
+export default ChatInterface;

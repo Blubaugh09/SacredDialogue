@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CharacterSelection from './components/CharacterSelection';
 import ChatInterface from './components/ChatInterface';
 import StoryMode from './components/StoryMode';
 import useCharacterAnimation from './hooks/useCharacterAnimation';
 import { generateCharacterResponse, generateStoryResponse, getSuggestionUpdates } from './services/aiService';
 import { textToSpeech, getVoiceForCharacter, prepareGreetingAudio } from './services/audioService';
+import { saveConversation, saveSession, findSimilarConversation, getPreviousConversations } from './firebase/services';
+import { testFirebaseConnection } from './utils/firebaseTestUtil';
+import { createAudioFromUrl, fixFirebaseStorageUrl } from './utils/audioUtils';
+import { v4 as uuidv4 } from 'uuid';
 
 // Import all characters from the correct index file
 import allCharacters from './data/characters/index';
@@ -26,9 +30,46 @@ function App() {
   const [responseAudio, setResponseAudio] = useState(null);
   const [showStoryMode, setShowStoryMode] = useState(false);
   const [activeStory, setActiveStory] = useState(null);
+  const [firebaseError, setFirebaseError] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
+  const [isFirebaseTesting, setIsFirebaseTesting] = useState(false);
+  const [playedMessages, setPlayedMessages] = useState(new Set());
+  const [currentAudio, setCurrentAudio] = useState(null);
+  const [responseTime, setResponseTime] = useState({});
   
   // Use the character animation hook
   const positions = useCharacterAnimation(allCharacters);
+  
+  // Generate a unique session ID for tracking conversations
+  useEffect(() => {
+    if (!sessionId) {
+      setSessionId(uuidv4());
+    }
+  }, [sessionId]);
+  
+  // Save session data when a character is selected
+  useEffect(() => {
+    if (selectedCharacter && sessionId) {
+      const saveSessionData = async () => {
+        try {
+          await saveSession(sessionId, {
+            character: selectedCharacter.name,
+            startTime: new Date().toISOString(),
+            device: {
+              userAgent: navigator.userAgent,
+              platform: navigator.platform,
+              language: navigator.language
+            }
+          });
+        } catch (error) {
+          console.error("Error saving session:", error);
+          setFirebaseError("Failed to save session data");
+        }
+      };
+      
+      saveSessionData();
+    }
+  }, [selectedCharacter, sessionId]);
   
   // Character selection handler - now loads character data dynamically
   const handleCharacterSelect = async (character) => {
@@ -56,35 +97,173 @@ function App() {
       // Set character-specific suggestions
       setSuggestions(characterData.defaultSuggestions);
       
+      // Flag to track if we've already handled the greeting with cached audio
+      let shouldSkipGreeting = false;
+      
+      // Preload previous conversations from Firestore
+      try {
+        console.log(`Preloading conversations for ${character.name}...`);
+        const previousConversations = await getPreviousConversations(character.name);
+        console.log(`Found ${previousConversations.length} previous conversations`);
+        
+        // Check if we have a cached greeting response with valid audio
+        const cachedGreeting = previousConversations.find(conv => 
+          conv.message === "" && conv.response === characterData.greeting
+        );
+        
+        if (cachedGreeting && cachedGreeting.audioUrl) {
+          console.log('Found cached greeting with audio:', cachedGreeting);
+          
+          // Try to create an audio element from the cached URL
+          try {
+            const audioUrl = fixFirebaseStorageUrl(cachedGreeting.audioUrl);
+            const audio = await createAudioFromUrl(
+              audioUrl, 
+              () => setResponseAudio(null)
+            );
+            
+            if (audio) {
+              console.log('Successfully created audio for cached greeting');
+              
+              // Update message with audio immediately
+              setMessages([{
+                id: greetingId,
+                type: 'character',
+                text: characterData.greeting,
+                audio: audio
+              }]);
+              
+              // Set as current audio
+              setResponseAudio(audio);
+              
+              // Play the audio
+              setTimeout(() => {
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                  playPromise.catch(error => {
+                    console.error('Error playing cached greeting audio:', error);
+                  });
+                }
+              }, 100);
+              
+              // Set a flag to skip the setTimeout block below 
+              // since we've already handled the greeting
+              shouldSkipGreeting = true;
+            } else {
+              console.log('Failed to create audio for cached greeting, will generate new audio');
+            }
+          } catch (error) {
+            console.error('Error setting up cached greeting audio:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error preloading conversations:', error);
+      }
+      
       // Handle greeting audio after loading other UI elements
       setTimeout(async () => {
-        // Check if we have cached greeting audio
-        let greetingAudio = greetingAudioCache.get(character.name);
-        
-        if (!greetingAudio) {
-          // If not in cache, prepare it now
-          greetingAudio = await prepareGreetingAudio(characterData);
-          
-          // Store in cache for future use
-          if (greetingAudio) {
-            greetingAudioCache.set(character.name, greetingAudio.cloneNode());
-          }
-        } else {
-          // If we're using cached audio, create a fresh clone to play
-          greetingAudio = greetingAudio.cloneNode();
+        // Skip if we've already handled the greeting with cached audio
+        if (shouldSkipGreeting) {
+          console.log('Skipping greeting generation, using cached audio');
+          return;
         }
         
-        // Set as current response audio and play
-        if (greetingAudio) {
-          // Update the message with the audio
+        try {
+          // Check if we have cached greeting audio
+          let greetingAudio = greetingAudioCache.get(character.name);
+          
+          if (!greetingAudio) {
+            // If not in cache, prepare it now
+            greetingAudio = await prepareGreetingAudio(characterData);
+            
+            // Store in cache for future use
+            if (greetingAudio) {
+              greetingAudioCache.set(character.name, greetingAudio.cloneNode());
+            }
+          } else {
+            // If we're using cached audio, create a fresh clone to play
+            greetingAudio = greetingAudio.cloneNode();
+          }
+          
+          // Set as current response audio and play
+          if (greetingAudio) {
+            // Update the message with the audio
+            setMessages([{
+              id: greetingId,
+              type: 'character',
+              text: characterData.greeting,
+              audio: greetingAudio
+            }]);
+            
+            setResponseAudio(greetingAudio);
+            
+            // Try playing the audio
+            try {
+              const playPromise = greetingAudio.play();
+              if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                  console.error('Error playing greeting audio:', error);
+                });
+              }
+            } catch (playError) {
+              console.error('Error playing greeting audio:', playError);
+            }
+            
+            // Save the greeting message to Firebase if it's not already saved
+            try {
+              // Convert audio to blob for storage
+              const audioBlob = await fetch(greetingAudio.src)
+                .then(r => r.blob())
+                .catch(err => {
+                  console.error('Error fetching audio blob:', err);
+                  return null; // Return null if fetch fails
+                });
+              
+              // Check if we already have this greeting saved (to avoid duplicates)
+              const previousConversations = await getPreviousConversations(character.name, 5);
+              const existingGreeting = previousConversations.find(conv => 
+                conv.message === "" && conv.response === characterData.greeting
+              );
+              
+              if (!existingGreeting) {
+                if (audioBlob) {
+                  const savedConversation = await saveConversation(
+                    character.name,
+                    "", // No user message for greeting
+                    characterData.greeting,
+                    audioBlob,
+                    sessionId
+                  );
+                  
+                  console.log('Saved greeting conversation:', savedConversation);
+                } else {
+                  // If we couldn't get the audio blob, save without audio
+                  const savedConversation = await saveConversation(
+                    character.name,
+                    "", // No user message for greeting
+                    characterData.greeting,
+                    null, // No audio
+                    sessionId
+                  );
+                  
+                  console.log('Saved greeting conversation without audio:', savedConversation);
+                }
+              } else {
+                console.log('Greeting already saved, not duplicating:', existingGreeting);
+              }
+            } catch (error) {
+              console.error('Error saving greeting to Firebase:', error);
+              setFirebaseError(`Failed to save greeting: ${error.message}`);
+            }
+          }
+        } catch (error) {
+          console.error('Error setting up greeting audio:', error);
+          // Update UI even without audio
           setMessages([{
             id: greetingId,
             type: 'character',
-            text: characterData.greeting,
-            audio: greetingAudio
+            text: characterData.greeting
           }]);
-          
-          setResponseAudio(greetingAudio);
         }
       }, 100);
       
@@ -145,63 +324,221 @@ function App() {
     }]);
     
     try {
-      // Get response from the appropriate AI service based on whether we're in story mode
-      let response;
-      if (activeStory) {
-        response = await generateStoryResponse(
-          characterData,
-          activeStory,
-          newMessages
-        );
-      } else {
-        response = await generateCharacterResponse(
-          characterData, 
-          userMessage, 
-          newMessages
-        );
-      }
+      // Check for cached conversations
+      console.log(`Checking for cached response for: "${userMessage}"`);
+      const cachedConversation = await findSimilarConversation(characterData.name, userMessage);
       
-      // Generate ID for the response message
-      const responseId = generateMessageId();
-      
-      // Start preparing the audio as soon as we have the text response
-      const voice = getVoiceForCharacter(characterData);
-      const audioPromise = textToSpeech(response, voice);
-      
-      // Prepare the audio in the background while still showing typing
-      const audioBlob = await audioPromise;
-      
-      // Create the audio element
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      
-      // Configure audio
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        setResponseAudio(null);
-      };
-      
-      // Store the prepared audio
-      setResponseAudio(audio);
-      
-      // Now that we have both the text and audio ready, update the UI
-      setMessages(prev => [
-        ...prev.slice(0, typingIndicatorIndex),
-        { 
-          id: responseId,
-          type: 'character', 
-          text: response,
-          audio: audio, // Attach the audio to the message
-          requestStartTime: requestStartTime // Track when the request started
+      if (cachedConversation && cachedConversation.response) {
+        console.log('Found cached response:', cachedConversation);
+        
+        // Use cached conversation
+        const response = cachedConversation.response;
+        
+        // Generate ID for the response message
+        const responseId = generateMessageId();
+        
+        let audio = null;
+        
+        // If we have a valid cached audio URL, use that
+        if (cachedConversation.audioUrl) {
+          console.log('Attempting to use cached audio URL:', cachedConversation.audioUrl);
+          
+          try {
+            // Use our utility to create an audio element from the URL
+            audio = await createAudioFromUrl(
+              cachedConversation.audioUrl, 
+              () => setResponseAudio(null)
+            );
+            
+            if (audio) {
+              console.log('Successfully created audio element with cached URL');
+              // Store the prepared audio
+              setResponseAudio(audio);
+            }
+          } catch (error) {
+            console.error('Error creating audio from cached URL:', error);
+            audio = null;
+          }
         }
-      ]);
-      
-      // Play the audio (ChatInterface will handle this)
-      
-      // Update suggestions based on the conversation if not in story mode
-      if (!activeStory) {
-        const newSuggestions = getSuggestionUpdates(characterData, userMessage);
-        setSuggestions(newSuggestions);
+        
+        // If we couldn't use cached audio, generate new audio
+        if (!audio) {
+          console.log('No valid cached audio, generating new audio');
+          try {
+            const voice = getVoiceForCharacter(characterData);
+            const audioBlob = await textToSpeech(response, voice);
+            
+            // Create the audio element
+            const audioUrl = URL.createObjectURL(audioBlob);
+            audio = new Audio(audioUrl);
+            
+            // Configure audio
+            audio.onended = () => {
+              if (audioUrl) URL.revokeObjectURL(audioUrl);
+              setResponseAudio(null);
+            };
+            
+            // Store the prepared audio
+            setResponseAudio(audio);
+            
+            // We've found the cached response but had to regenerate audio
+            // Save the new audio to update the conversation
+            try {
+              // Check if we already have this conversation saved (to avoid duplicates)
+              const previousConversations = await getPreviousConversations(characterData.name, 5);
+              const existingConversation = previousConversations.find(conv => 
+                conv.message === userMessage && conv.response === response
+              );
+              
+              if (!existingConversation) {
+                const savedConversation = await saveConversation(
+                  characterData.name,
+                  userMessage,
+                  response,
+                  audioBlob,
+                  sessionId
+                );
+                
+                console.log('Saved new conversation:', savedConversation);
+              } else {
+                console.log('Conversation already exists, not duplicating:', existingConversation);
+              }
+            } catch (error) {
+              console.error('Error saving conversation to Firebase:', error);
+              setFirebaseError(error.message);
+            }
+          } catch (audioError) {
+            console.error('Error generating new audio for cached response:', audioError);
+          }
+        }
+        
+        // Now that we have both the text and audio ready, update the UI
+        setMessages(prev => [
+          ...prev.slice(0, typingIndicatorIndex),
+          { 
+            id: responseId,
+            type: 'character', 
+            text: response,
+            audio: audio, // Attach the audio to the message (might be null if there was an error)
+            requestStartTime: requestStartTime, // Track when the request started
+            isCached: true // Mark as cached response
+          }
+        ]);
+        
+        console.log('Using cached response for:', userMessage);
+        
+        // Try playing the audio if available
+        if (audio) {
+          try {
+            // Wait briefly to allow the message UI to update
+            setTimeout(() => {
+              const playPromise = audio.play();
+              if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                  console.error('Error playing cached audio:', error);
+                });
+              }
+            }, 100);
+          } catch (playError) {
+            console.error('Error playing cached audio:', playError);
+          }
+        }
+        
+        // Update suggestions based on the conversation if not in story mode
+        if (!activeStory) {
+          const newSuggestions = getSuggestionUpdates(characterData, userMessage);
+          setSuggestions(newSuggestions);
+        }
+      } else {
+        console.log('No cached response found, generating new response');
+        // Get response from the appropriate AI service based on whether we're in story mode
+        let response;
+        if (activeStory) {
+          response = await generateStoryResponse(
+            characterData,
+            activeStory,
+            newMessages
+          );
+        } else {
+          response = await generateCharacterResponse(
+            characterData, 
+            userMessage, 
+            newMessages
+          );
+        }
+        
+        // Generate ID for the response message
+        const responseId = generateMessageId();
+        
+        // Start preparing the audio as soon as we have the text response
+        const voice = getVoiceForCharacter(characterData);
+        
+        let audioBlob;
+        let audio = null;
+        
+        try {
+          audioBlob = await textToSpeech(response, voice);
+          
+          // Create the audio element
+          const audioUrl = URL.createObjectURL(audioBlob);
+          audio = new Audio(audioUrl);
+          
+          // Configure audio
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            setResponseAudio(null);
+          };
+          
+          // Store the prepared audio
+          setResponseAudio(audio);
+        } catch (audioError) {
+          console.error('Error generating audio:', audioError);
+          // Continue without audio if there's an error
+        }
+        
+        // Now that we have both the text and audio ready, update the UI
+        setMessages(prev => [
+          ...prev.slice(0, typingIndicatorIndex),
+          { 
+            id: responseId,
+            type: 'character', 
+            text: response,
+            audio: audio, // Attach the audio to the message
+            requestStartTime: requestStartTime // Track when the request started
+          }
+        ]);
+        
+        // Save conversation to Firebase
+        try {
+          // Check if we already have this conversation saved (to avoid duplicates)
+          const previousConversations = await getPreviousConversations(characterData.name, 5);
+          const existingConversation = previousConversations.find(conv => 
+            conv.message === userMessage && conv.response === response
+          );
+          
+          if (!existingConversation) {
+            const savedConversation = await saveConversation(
+              characterData.name,
+              userMessage,
+              response,
+              audioBlob,
+              sessionId
+            );
+            
+            console.log('Saved new conversation:', savedConversation);
+          } else {
+            console.log('Conversation already exists, not duplicating:', existingConversation);
+          }
+        } catch (error) {
+          console.error('Error saving conversation to Firebase:', error);
+          setFirebaseError(error.message);
+        }
+        
+        // Update suggestions based on the conversation if not in story mode
+        if (!activeStory) {
+          const newSuggestions = getSuggestionUpdates(characterData, userMessage);
+          setSuggestions(newSuggestions);
+        }
       }
     } catch (error) {
       console.error('Error generating response:', error);
@@ -236,12 +573,24 @@ function App() {
       setResponseAudio(null);
     }
     
+    // Save session end information
+    if (selectedCharacter) {
+      saveSession(sessionId, {
+        endTime: new Date().toISOString(),
+        messageCount: messages.filter(m => !m.isTyping).length,
+        completed: true
+      }).catch(error => {
+        console.error('Error updating session:', error);
+      });
+    }
+    
     setSelectedCharacter(null);
     setCharacterData(null);
     setMessages([]);
     setInputValue('');
     setSuggestions([]);
     setActiveStory(null);
+    setFirebaseError(null);
   };
   
   // Toggle story mode dialog
@@ -294,6 +643,24 @@ function App() {
         audio: audio
       }]);
       
+      // Save story introduction to Firebase
+      try {
+        const storyIntro = `Story Mode: ${story.title} - ${story.type}`;
+        
+        const savedConversation = await saveConversation(
+          characterData.name,
+          storyIntro,
+          response,
+          audioBlob,
+          sessionId
+        );
+        
+        console.log('Saved story introduction:', savedConversation);
+      } catch (error) {
+        console.error('Error saving story introduction to Firebase:', error);
+        setFirebaseError(error.message);
+      }
+      
       // Set empty suggestions since we're in story mode
       setSuggestions([]);
     } catch (error) {
@@ -310,6 +677,144 @@ function App() {
     }
   };
   
+  // Function to test Firebase connection
+  const handleTestFirebase = async () => {
+    setIsFirebaseTesting(true);
+    setFirebaseError(null);
+    
+    try {
+      const result = await testFirebaseConnection();
+      console.log("Firebase test result:", result);
+      
+      if (result.firestore.success && result.storage.success) {
+        alert("Firebase connection successful!\n\nFirestore: ✅\nStorage: ✅");
+      } else {
+        let errorMessage = "Firebase connection issues:\n\n";
+        if (!result.firestore.success) {
+          errorMessage += `Firestore: ❌ - ${result.firestore.error}\n`;
+        } else {
+          errorMessage += "Firestore: ✅\n";
+        }
+        
+        if (!result.storage.success) {
+          errorMessage += `Storage: ❌ - ${result.storage.error}`;
+        } else {
+          errorMessage += "Storage: ✅";
+        }
+        
+        alert(errorMessage);
+        setFirebaseError("Firebase connection test failed");
+      }
+    } catch (error) {
+      console.error("Firebase test error:", error);
+      alert(`Firebase test failed: ${error.message}`);
+      setFirebaseError("Firebase connection test failed");
+    } finally {
+      setIsFirebaseTesting(false);
+    }
+  };
+  
+  // Find the last character message with audio that hasn't been played yet
+  const lastMessageWithAudio = [...messages].reverse().find(
+    msg => msg.type === 'character' && msg.audio && !msg.isTyping && !playedMessages.has(msg.text)
+  );
+  
+  if (lastMessageWithAudio?.audio) {
+    // Clean up any currently playing audio
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.onended = null;
+    }
+    
+    // Mark this message as played to avoid duplicate playback
+    setPlayedMessages(prev => new Set([...prev, lastMessageWithAudio.text]));
+    
+    // Play the new audio
+    const audio = lastMessageWithAudio.audio;
+    setCurrentAudio(audio);
+    
+    // Calculate response time (if there's a start time for this message)
+    if (lastMessageWithAudio.requestStartTime) {
+      const endTime = Date.now();
+      const responseTimeMs = endTime - lastMessageWithAudio.requestStartTime;
+      setResponseTime(prev => ({
+        ...prev,
+        [lastMessageWithAudio.id]: responseTimeMs
+      }));
+    }
+    
+    // Play the audio - handle mobile autoplay restrictions
+    const playAudio = () => {
+      if (!audio || !audio.src) {
+        console.error('Invalid audio source', audio);
+        return;
+      }
+      
+      try {
+        // Check if the audio is valid and has a source before playing
+        if (audio.readyState === 0) {
+          console.log('Audio not ready yet, waiting for loadeddata event');
+          
+          // Check if the source is from a Firebase Storage URL
+          if (audio.src.includes('firebasestorage.googleapis.com')) {
+            console.log('Firebase storage URL detected, adding CORS parameters');
+            // Add token and alt parameter if not present
+            if (!audio.src.includes('alt=media')) {
+              const separator = audio.src.includes('?') ? '&' : '?';
+              audio.src = `${audio.src}${separator}alt=media`;
+            }
+          }
+          
+          // Add event listener to play when loaded
+          audio.addEventListener('loadeddata', () => {
+            console.log('Audio loaded, attempting to play');
+            attemptPlay();
+          }, { once: true });
+          
+          // Set a timeout in case the loading takes too long
+          setTimeout(() => {
+            if (audio.readyState === 0) {
+              console.error('Audio failed to load within timeout');
+              
+              // Mark as not played so UI can be updated
+              setPlayedMessages(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(lastMessageWithAudio.text);
+                return newSet;
+              });
+            }
+          }, 5000); // 5 second timeout
+        } else {
+          // Audio is ready to play
+          attemptPlay();
+        }
+      } catch (error) {
+        console.error('Error setting up audio playback:', error);
+      }
+      
+      // Helper function to attempt playing with error handling
+      function attemptPlay() {
+        const playPromise = audio.play();
+        
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error('AutoPlay failed:', error);
+            // If autoplay fails (e.g., on mobile), we'll provide visual feedback
+            // to prompt user to interact
+            
+            // We don't remove from played messages - this allows the autoplay
+            // to try again after user interaction
+            setPlayedMessages(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(lastMessageWithAudio.text);
+              return newSet;
+            });
+          });
+        }
+      }
+    };
+  }
+  
   return (
     <div className="flex flex-col h-screen bg-slate-100">
       {loading && (
@@ -320,12 +825,28 @@ function App() {
         </div>
       )}
       
+      {firebaseError && (
+        <div className="fixed top-0 left-0 right-0 bg-red-500 text-white p-2 text-sm text-center z-50">
+          Firebase error: {firebaseError}. Storage functionality may be limited.
+        </div>
+      )}
+      
       {!selectedCharacter ? (
         <CharacterSelection 
           characters={allCharacters} 
           positions={positions} 
           onSelectCharacter={handleCharacterSelect} 
-        />
+        >
+          <div className="absolute bottom-4 right-4">
+            <button 
+              onClick={handleTestFirebase}
+              disabled={isFirebaseTesting}
+              className="bg-blue-500 text-white px-3 py-1 rounded text-sm opacity-50 hover:opacity-100 disabled:bg-blue-300"
+            >
+              {isFirebaseTesting ? "Testing..." : "Test Firebase Connection"}
+            </button>
+          </div>
+        </CharacterSelection>
       ) : (
         <>
           <ChatInterface 

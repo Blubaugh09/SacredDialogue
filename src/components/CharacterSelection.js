@@ -1,6 +1,6 @@
 import React from 'react';
 
-const CharacterSelection = ({ characters, positions, onSelectCharacter }) => {
+const CharacterSelection = ({ children, characters, positions, onSelectCharacter }) => {
   // Function to render character avatar (text or video)
   const renderCharacterAvatar = (character) => {
     // Check if video exists for the character
@@ -84,7 +84,7 @@ const CharacterSelection = ({ characters, positions, onSelectCharacter }) => {
               >
                 {renderCharacterAvatar(character)}
                 <span className="text-lg font-semibold text-amber-900 group-hover:text-amber-700">{character.name}</span>
-                
+                <span className="text-xs text-amber-700 italic mt-1 opacity-80 group-hover:opacity-100">Speak with {character.name}</span>
               </div>
             ))}
           </div>
@@ -94,6 +94,8 @@ const CharacterSelection = ({ characters, positions, onSelectCharacter }) => {
           </div>
         </div>
       </div>
+      
+      {children}
     </div>
   );
 };
