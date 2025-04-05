@@ -1,0 +1,129 @@
+.shared-conversation-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  background-color: #fefbf6;
+  min-height: 100vh;
+  font-family: 'Georgia', serif;
+}
+
+.shared-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e9d5a1;
+}
+
+.shared-header h1 {
+  font-size: 1.8rem;
+  color: #8b5a2b;
+  font-weight: 700;
+}
+
+.home-link {
+  padding: 0.5rem 1rem;
+  background-color: #8b5a2b;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  transition: background-color 0.3s;
+}
+
+.home-link:hover {
+  background-color: #6d4520;
+}
+
+.shared-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.question-card, .response-card {
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.question-card {
+  background-color: #f5ebd7;
+  border-left: 4px solid #d4a76a;
+}
+
+.response-card {
+  background-color: #fff;
+  border-left: 4px solid #8b5a2b;
+}
+
+.question-card h3, .response-card h3 {
+  color: #6d4520;
+  margin-bottom: 0.75rem;
+  font-size: 1.2rem;
+}
+
+.question-card p, .response-card p {
+  color: #3d2914;
+  line-height: 1.6;
+  font-size: 1.1rem;
+}
+
+.audio-button {
+  margin-top: 1rem;
+  padding: 0.6rem 1.2rem;
+  background-color: #8b5a2b;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.3s;
+}
+
+.audio-button:hover {
+  background-color: #6d4520;
+}
+
+.timestamp {
+  text-align: right;
+  color: #8d8d8d;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  font-size: 1.2rem;
+  color: #8b5a2b;
+}
+
+.error-message {
+  padding: 2rem;
+  background-color: #fff3f3;
+  border: 1px solid #ffcaca;
+  border-radius: 8px;
+  color: #d83030;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 600px) {
+  .shared-conversation-container {
+    padding: 1rem;
+  }
+  
+  .shared-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  
+  .question-card, .response-card {
+    padding: 1rem;
+  }
+} 

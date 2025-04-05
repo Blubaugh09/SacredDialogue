@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import CharacterSelection from './components/CharacterSelection';
 import ChatInterface from './components/ChatInterface';
 import StoryMode from './components/StoryMode';
+import SharedConversation from './components/SharedConversation';
 import useCharacterAnimation from './hooks/useCharacterAnimation';
 import { generateCharacterResponse, generateStoryResponse, getSuggestionUpdates } from './services/aiService';
 import { textToSpeech, getVoiceForCharacter, prepareGreetingAudio } from './services/audioService';
@@ -9,6 +11,8 @@ import { saveConversation, saveSession, findSimilarConversation, getPreviousConv
 import { testFirebaseConnection } from './utils/firebaseTestUtil';
 import { createAudioFromUrl, fixFirebaseStorageUrl } from './utils/audioUtils';
 import { v4 as uuidv4 } from 'uuid';
+import './App.css';
+import './firebaseInit';
 
 // Import all characters from the correct index file
 import allCharacters from './data/characters/index';
@@ -38,6 +42,9 @@ function App() {
   
   // Use the character animation hook
   const positions = useCharacterAnimation(allCharacters);
+  
+  // Use navigate for routing
+  const navigate = useNavigate();
   
   // Generate a unique session ID for tracking conversations
   useEffect(() => {
@@ -399,6 +406,17 @@ function App() {
                 );
                 
                 console.log('Saved new conversation:', savedConversation);
+                
+                // Store the conversation ID with the message for sharing
+                const updatedMessages = [...messages];
+                const messageIndex = updatedMessages.findIndex(msg => 
+                  msg.type === 'character' && msg.text === response
+                );
+                
+                if (messageIndex !== -1) {
+                  updatedMessages[messageIndex].conversationId = savedConversation.id;
+                  setMessages(updatedMessages);
+                }
               } else {
                 console.log('Conversation already exists, not duplicating:', existingConversation);
               }
@@ -525,6 +543,17 @@ function App() {
             );
             
             console.log('Saved new conversation:', savedConversation);
+            
+            // Store the conversation ID with the message for sharing
+            const updatedMessages = [...messages];
+            const messageIndex = updatedMessages.findIndex(msg => 
+              msg.type === 'character' && msg.text === response
+            );
+            
+            if (messageIndex !== -1) {
+              updatedMessages[messageIndex].conversationId = savedConversation.id;
+              setMessages(updatedMessages);
+            }
           } else {
             console.log('Conversation already exists, not duplicating:', existingConversation);
           }
@@ -590,6 +619,9 @@ function App() {
     setSuggestions([]);
     setActiveStory(null);
     setFirebaseError(null);
+    
+    // Navigate to home
+    navigate('/');
   };
   
   // Toggle story mode dialog
@@ -747,6 +779,7 @@ function App() {
     }
   }
   
+  // Main app component with routing
   return (
     <div className="flex flex-col h-screen bg-slate-100">
       {loading && (
@@ -763,46 +796,56 @@ function App() {
         </div>
       )}
       
-      {!selectedCharacter ? (
-        <CharacterSelection 
-          characters={allCharacters} 
-          positions={positions} 
-          onSelectCharacter={handleCharacterSelect} 
-        >
-          <div className="absolute bottom-4 right-4">
-            <button 
-              onClick={handleTestFirebase}
-              disabled={isFirebaseTesting}
-              className="bg-blue-500 text-white px-3 py-1 rounded text-sm opacity-50 hover:opacity-100 disabled:bg-blue-300"
-            >
-              {isFirebaseTesting ? "Testing..." : "Test Firebase Connection"}
-            </button>
-          </div>
-        </CharacterSelection>
-      ) : (
-        <>
-          <ChatInterface 
-            selectedCharacter={characterData || selectedCharacter}
-            messages={messages}
-            inputValue={inputValue}
-            setInputValue={setInputValue}
-            handleSendMessage={handleSendMessage}
-            suggestions={suggestions}
-            handleSuggestionClick={handleSuggestionClick}
-            onBackClick={handleBackClick}
-            onStoryModeClick={toggleStoryMode}
-            activeStory={activeStory}
-          />
-          
-          {showStoryMode && (
-            <StoryMode
-              selectedCharacter={characterData || selectedCharacter}
-              onStorySelect={handleStorySelect}
-              onClose={toggleStoryMode}
-            />
-          )}
-        </>
-      )}
+      <Routes>
+        <Route path="/" element={
+          <>
+            {selectedCharacter ? (
+              <>
+                <ChatInterface 
+                  selectedCharacter={characterData || selectedCharacter}
+                  messages={messages}
+                  inputValue={inputValue}
+                  setInputValue={setInputValue}
+                  handleSendMessage={handleSendMessage}
+                  suggestions={suggestions}
+                  handleSuggestionClick={handleSuggestionClick}
+                  onBackClick={handleBackClick}
+                  onStoryModeClick={toggleStoryMode}
+                  activeStory={activeStory}
+                />
+                
+                {showStoryMode && (
+                  <StoryMode 
+                    selectedCharacter={characterData || selectedCharacter}
+                    onStorySelect={handleStorySelect}
+                    onClose={toggleStoryMode}
+                  />
+                )}
+              </>
+            ) : (
+              <CharacterSelection
+                characters={allCharacters}
+                positions={positions}
+                onSelectCharacter={handleCharacterSelect}
+              >
+                <div className="absolute bottom-4 right-4 z-20">
+                  <button
+                    onClick={handleTestFirebase}
+                    disabled={isFirebaseTesting}
+                    className="bg-blue-500 text-white px-4 py-2 rounded shadow hover:bg-blue-600 disabled:bg-blue-300"
+                  >
+                    {isFirebaseTesting ? "Testing..." : "Test Firebase Connection"}
+                  </button>
+                  {firebaseError && (
+                    <p className="text-red-500 text-sm mt-1">{firebaseError}</p>
+                  )}
+                </div>
+              </CharacterSelection>
+            )}
+          </>
+        } />
+        <Route path="/share/:characterName/:conversationId" element={<SharedConversation />} />
+      </Routes>
     </div>
   );
 }

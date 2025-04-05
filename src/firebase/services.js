@@ -29,7 +29,7 @@ import { areSimilarQuestions } from '../utils/conversationUtils';
  * @param {string} aiResponse - The AI's response
  * @param {Blob} audioBlob - The audio blob of the response
  * @param {string} sessionId - The unique session ID
- * @returns {Promise<Object>} - The saved document reference
+ * @returns {Promise<Object>} - The saved document reference with ID
  */
 export const saveConversation = async (characterName, userMessage, aiResponse, audioBlob, sessionId) => {
   try {
@@ -52,9 +52,11 @@ export const saveConversation = async (characterName, userMessage, aiResponse, a
     const characterCollection = collection(db, 'characters', characterName.toLowerCase(), 'conversations');
     const docRef = await addDoc(characterCollection, conversationData);
     
+    // Return conversation data with the document ID
     return {
       id: docRef.id,
-      ...conversationData
+      ...conversationData,
+      timestamp: new Date() // Replace serverTimestamp with actual date for immediate use
     };
   } catch (error) {
     console.error('Error saving conversation:', error);
@@ -231,6 +233,39 @@ export const findSimilarConversation = async (characterName, question, similarit
     return null;
   } catch (error) {
     console.error('Error finding similar conversation:', error);
+    return null;
+  }
+};
+
+/**
+ * Retrieves a specific conversation by its ID
+ * 
+ * @param {string} characterName - The name of the character
+ * @param {string} conversationId - The ID of the conversation document
+ * @returns {Promise<Object|null>} - The conversation data or null if not found
+ */
+export const getConversationById = async (characterName, conversationId) => {
+  try {
+    const characterCollection = collection(db, 'characters', characterName.toLowerCase(), 'conversations');
+    const conversationRef = doc(characterCollection, conversationId);
+    const conversationDoc = await getDoc(conversationRef);
+    
+    if (!conversationDoc.exists()) {
+      console.log('Conversation not found:', conversationId);
+      return null;
+    }
+    
+    // Get conversation data
+    const conversationData = {
+      id: conversationDoc.id,
+      ...conversationDoc.data(),
+      // Convert server timestamp to JS Date if it exists
+      timestamp: conversationDoc.data().timestamp?.toDate?.() || null
+    };
+    
+    return conversationData;
+  } catch (error) {
+    console.error('Error getting conversation by ID:', error);
     return null;
   }
 }; 

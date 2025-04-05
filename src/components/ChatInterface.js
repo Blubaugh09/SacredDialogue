@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Send, Volume2, VolumeX, Mic, MicOff, Repeat, Video, ArrowLeft, Clock, BookOpen } from 'lucide-react';
+import { Send, Volume2, VolumeX, Mic, MicOff, Repeat, Video, ArrowLeft, Clock, BookOpen, Share2 } from 'lucide-react';
 import { startRecording, stopRecording, speechToText } from '../services/audioService';
 
 const ChatInterface = ({ 
@@ -27,6 +27,8 @@ const ChatInterface = ({
   const [responseTime, setResponseTime] = useState({});
   const videoRef = useRef(null);
   const [userInteracted, setUserInteracted] = useState(false);
+  const [shareTooltip, setShareTooltip] = useState('');
+  const [showShareTooltip, setShowShareTooltip] = useState(false);
   
   // Check if video exists for the selected character
   useEffect(() => {
@@ -276,8 +278,6 @@ const ChatInterface = ({
     setIsRecording(false);
   };
   
-
-  
   // Toggle video display
   const toggleVideo = () => {
     setShowVideo(!showVideo);
@@ -369,6 +369,65 @@ const ChatInterface = ({
     }
   };
   
+  // Add this function to generate share links for messages
+  const generateShareLink = (characterName, conversationId) => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/share/${characterName}/${conversationId}`;
+  };
+
+  // Add this function to copy text to clipboard
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      return false;
+    }
+  };
+
+  // Function to handle sharing a conversation
+  const handleShare = async (message) => {
+    // Only character messages with IDs can be shared
+    if (message.type !== 'character') return;
+    
+    // Use either the stored conversationId or the message id
+    const messageId = message.conversationId || message.id;
+    
+    if (!messageId) {
+      console.error('No valid ID found for sharing this message');
+      setShareTooltip('Cannot share this message');
+      setShowShareTooltip(true);
+      
+      // Hide the tooltip after 3 seconds
+      setTimeout(() => {
+        setShowShareTooltip(false);
+      }, 3000);
+      
+      return;
+    }
+    
+    // Generate a share link using the character name and message ID
+    const shareLink = generateShareLink(selectedCharacter.name, messageId);
+    
+    // Copy the link to clipboard
+    const copied = await copyToClipboard(shareLink);
+    
+    // Show feedback to the user
+    if (copied) {
+      setShareTooltip('Link copied to clipboard!');
+    } else {
+      setShareTooltip('Failed to copy link. Please try again.');
+    }
+    
+    setShowShareTooltip(true);
+    
+    // Hide the tooltip after 3 seconds
+    setTimeout(() => {
+      setShowShareTooltip(false);
+    }, 3000);
+  };
+  
   // Render a typing indicator or the message text
   const renderMessageContent = (message) => {
     if (message.isTyping) {
@@ -390,14 +449,25 @@ const ChatInterface = ({
             Response: {(responseTime[message.id] / 1000).toFixed(2)}s
           </div>
         )}
-        {message.type === 'character' && message.audio && (
-          <button 
-            className="mt-2 text-xs text-amber-700 flex items-center hover:text-amber-500 transition-colors" 
-            onClick={() => playMessageAudio(message)}
-          >
-            <Repeat size={12} className="mr-1" /> Hear again
-          </button>
-        )}
+        <div className="mt-2 flex items-center gap-3">
+          {message.type === 'character' && message.audio && (
+            <button 
+              className="text-xs text-amber-700 flex items-center hover:text-amber-500 transition-colors" 
+              onClick={() => playMessageAudio(message)}
+            >
+              <Repeat size={12} className="mr-1" /> Hear again
+            </button>
+          )}
+          
+          {message.type === 'character' && (message.conversationId || message.id) && (
+            <button 
+              className="text-xs text-amber-700 flex items-center hover:text-amber-500 transition-colors" 
+              onClick={() => handleShare(message)}
+            >
+              <Share2 size={12} className="mr-1" /> Share
+            </button>
+          )}
+        </div>
       </div>
     );
   };
@@ -558,6 +628,13 @@ const ChatInterface = ({
           )}
         </div>
       </div>
+      
+      {/* Share tooltip */}
+      {showShareTooltip && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-amber-900 text-white px-4 py-2 rounded shadow-lg z-50">
+          {shareTooltip}
+        </div>
+      )}
     </div>
   );
 };
