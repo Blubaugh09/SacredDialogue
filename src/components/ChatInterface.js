@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Send, Volume2, VolumeX, Mic, MicOff, Repeat, Video, ArrowLeft, Clock } from 'lucide-react';
+import { Send, Volume2, VolumeX, Mic, MicOff, Repeat, Video, ArrowLeft, Clock, BookOpen } from 'lucide-react';
 import { startRecording, stopRecording, speechToText } from '../services/audioService';
 
 const ChatInterface = ({ 
@@ -10,7 +10,9 @@ const ChatInterface = ({
   handleSendMessage, 
   suggestions, 
   handleSuggestionClick, 
-  onBackClick 
+  onBackClick,
+  onStoryModeClick,
+  activeStory
 }) => {
   const messagesEndRef = useRef(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
@@ -336,8 +338,21 @@ const ChatInterface = ({
         <div>
           <h2 className="font-semibold text-xl">{selectedCharacter.name}</h2>
           <p className="text-xs text-amber-200">Figure from the Ancient Scriptures</p>
+          {activeStory && (
+            <p className="text-xs text-amber-100 mt-1 italic">
+              <span className="mr-1">•</span> {activeStory.title}
+            </p>
+          )}
         </div>
         <div className="ml-auto flex items-center">
+          <button 
+            className="mr-3 text-amber-200 hover:text-amber-50 flex items-center p-2 transition-colors"
+            onClick={onStoryModeClick}
+            title="Enter Story Mode"
+          >
+            <BookOpen size={20} />
+            <span className="ml-1 text-xs hidden md:inline">Story Mode</span>
+          </button>
           <button 
             className="mr-3 text-amber-200 hover:text-amber-50 p-2 transition-colors"
             onClick={toggleAudio}

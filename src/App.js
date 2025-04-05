@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import CharacterSelection from './components/CharacterSelection';
 import ChatInterface from './components/ChatInterface';
+import StoryMode from './components/StoryMode';
 import useCharacterAnimation from './hooks/useCharacterAnimation';
-import { generateCharacterResponse, getSuggestionUpdates } from './services/aiService';
+import { generateCharacterResponse, generateStoryResponse, getSuggestionUpdates } from './services/aiService';
 import { textToSpeech, getVoiceForCharacter, prepareGreetingAudio } from './services/audioService';
 
 // Import all characters from the correct index file
@@ -23,6 +24,8 @@ function App() {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [responseAudio, setResponseAudio] = useState(null);
+  const [showStoryMode, setShowStoryMode] = useState(false);
+  const [activeStory, setActiveStory] = useState(null);
   
   // Use the character animation hook
   const positions = useCharacterAnimation(allCharacters);
@@ -142,12 +145,21 @@ function App() {
     }]);
     
     try {
-      // Get response from the AI service
-      const response = await generateCharacterResponse(
-        characterData, 
-        userMessage, 
-        newMessages
-      );
+      // Get response from the appropriate AI service based on whether we're in story mode
+      let response;
+      if (activeStory) {
+        response = await generateStoryResponse(
+          characterData,
+          activeStory,
+          newMessages
+        );
+      } else {
+        response = await generateCharacterResponse(
+          characterData, 
+          userMessage, 
+          newMessages
+        );
+      }
       
       // Generate ID for the response message
       const responseId = generateMessageId();
@@ -186,9 +198,11 @@ function App() {
       
       // Play the audio (ChatInterface will handle this)
       
-      // Update suggestions based on the conversation
-      const newSuggestions = getSuggestionUpdates(characterData, userMessage);
-      setSuggestions(newSuggestions);
+      // Update suggestions based on the conversation if not in story mode
+      if (!activeStory) {
+        const newSuggestions = getSuggestionUpdates(characterData, userMessage);
+        setSuggestions(newSuggestions);
+      }
     } catch (error) {
       console.error('Error generating response:', error);
       // Replace typing indicator with error message
@@ -227,6 +241,73 @@ function App() {
     setMessages([]);
     setInputValue('');
     setSuggestions([]);
+    setActiveStory(null);
+  };
+  
+  // Toggle story mode dialog
+  const toggleStoryMode = () => {
+    setShowStoryMode(!showStoryMode);
+  };
+  
+  // Handle story selection
+  const handleStorySelect = async (story) => {
+    setActiveStory(story);
+    setShowStoryMode(false);
+    
+    // Clear previous conversation
+    setMessages([]);
+    
+    // Set loading state
+    setLoading(true);
+    
+    try {
+      // Generate initial story response
+      const response = await generateStoryResponse(
+        characterData,
+        story,
+        [] // Empty conversation history since this is the start
+      );
+      
+      // Generate ID for the response message
+      const responseId = generateMessageId();
+      
+      // Prepare audio for the story introduction
+      const voice = getVoiceForCharacter(characterData);
+      const audioBlob = await textToSpeech(response, voice);
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      
+      // Configure audio
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        setResponseAudio(null);
+      };
+      
+      // Store the prepared audio
+      setResponseAudio(audio);
+      
+      // Add the story introduction message
+      setMessages([{ 
+        id: responseId,
+        type: 'character', 
+        text: response,
+        audio: audio
+      }]);
+      
+      // Set empty suggestions since we're in story mode
+      setSuggestions([]);
+    } catch (error) {
+      console.error('Error starting story:', error);
+      
+      // Add an error message
+      setMessages([{ 
+        id: generateMessageId(),
+        type: 'character', 
+        text: "I'm sorry, I'm having trouble beginning this story. Please try again later."
+      }]);
+    } finally {
+      setLoading(false);
+    }
   };
   
   return (
@@ -246,16 +327,28 @@ function App() {
           onSelectCharacter={handleCharacterSelect} 
         />
       ) : (
-        <ChatInterface 
-          selectedCharacter={characterData || selectedCharacter}
-          messages={messages}
-          inputValue={inputValue}
-          setInputValue={setInputValue}
-          handleSendMessage={handleSendMessage}
-          suggestions={suggestions}
-          handleSuggestionClick={handleSuggestionClick}
-          onBackClick={handleBackClick}
-        />
+        <>
+          <ChatInterface 
+            selectedCharacter={characterData || selectedCharacter}
+            messages={messages}
+            inputValue={inputValue}
+            setInputValue={setInputValue}
+            handleSendMessage={handleSendMessage}
+            suggestions={suggestions}
+            handleSuggestionClick={handleSuggestionClick}
+            onBackClick={handleBackClick}
+            onStoryModeClick={toggleStoryMode}
+            activeStory={activeStory}
+          />
+          
+          {showStoryMode && (
+            <StoryMode
+              selectedCharacter={characterData || selectedCharacter}
+              onStorySelect={handleStorySelect}
+              onClose={toggleStoryMode}
+            />
+          )}
+        </>
       )}
     </div>
   );

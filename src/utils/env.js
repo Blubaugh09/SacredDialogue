@@ -2,16 +2,12 @@
  * Environment variable handling utility
  */
 
-/**
- * Get an environment variable with a fallback value
- * 
- * @param {string} key - Environment variable key
- * @param {any} fallback - Fallback value if environment variable is not set
- * @returns {string|any} - Environment variable value or fallback
- */
-export const getEnv = (key, fallback = '') => {
-  const value = process.env[`REACT_APP_${key}`];
-  return value !== undefined ? value : fallback;
+// Environment configuration utilities
+
+// Helper function to get environment variables with fallbacks
+const getEnv = (key, fallback = '') => {
+  const fullKey = `REACT_APP_${key}`;
+  return process.env[fullKey] || fallback;
 };
 
 /**
@@ -27,8 +23,28 @@ export const hasEnv = (key) => {
 
 // Export important environment variables with fallbacks
 export const ENV = {
-  AI_API_KEY: getEnv('AI_API_KEY'),
-  AI_API_ENDPOINT: getEnv('AI_API_ENDPOINT', 'https://api.openai.com/v1/chat/completions'),
-  AI_MODEL: getEnv('AI_MODEL', 'gpt-3.5-turbo'),
+  AI_API_ENDPOINT: process.env.REACT_APP_AI_API_ENDPOINT || 'https://api.openai.com/v1/chat/completions',
+  AI_API_KEY: process.env.REACT_APP_AI_API_KEY || '',
+  AI_MODEL: process.env.REACT_APP_AI_MODEL || 'gpt-3.5-turbo',
   APP_NAME: getEnv('APP_NAME', 'Biblical Character Dialogue'),
+};
+
+// Check if an environment variable exists
+export const hasEnv = (key) => {
+  return ENV[key] && ENV[key].length > 0;
+};
+
+// Get the API endpoint
+export const getApiEndpoint = () => {
+  return ENV.AI_API_ENDPOINT;
+};
+
+// Get the API key
+export const getApiKey = () => {
+  return ENV.AI_API_KEY;
+};
+
+// Get the AI model
+export const getModel = () => {
+  return ENV.AI_MODEL;
 }; 
