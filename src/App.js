@@ -35,7 +35,6 @@ function App() {
   const [isFirebaseTesting, setIsFirebaseTesting] = useState(false);
   const [playedMessages, setPlayedMessages] = useState(new Set());
   const [currentAudio, setCurrentAudio] = useState(null);
-  const [responseTime, setResponseTime] = useState({});
   
   // Use the character animation hook
   const positions = useCharacterAnimation(allCharacters);
@@ -737,82 +736,15 @@ function App() {
     if (lastMessageWithAudio.requestStartTime) {
       const endTime = Date.now();
       const responseTimeMs = endTime - lastMessageWithAudio.requestStartTime;
-      setResponseTime(prev => ({
-        ...prev,
-        [lastMessageWithAudio.id]: responseTimeMs
-      }));
+      // Comment out or remove the line below since setResponseTime is not defined
+      // setResponseTime(prev => ({
+      //   ...prev,
+      //   [lastMessageWithAudio.id]: responseTimeMs
+      // }));
+      
+      // Log response time instead
+      console.log(`Response time for message ${lastMessageWithAudio.id}: ${responseTimeMs}ms`);
     }
-    
-    // Play the audio - handle mobile autoplay restrictions
-    const playAudio = () => {
-      if (!audio || !audio.src) {
-        console.error('Invalid audio source', audio);
-        return;
-      }
-      
-      try {
-        // Check if the audio is valid and has a source before playing
-        if (audio.readyState === 0) {
-          console.log('Audio not ready yet, waiting for loadeddata event');
-          
-          // Check if the source is from a Firebase Storage URL
-          if (audio.src.includes('firebasestorage.googleapis.com')) {
-            console.log('Firebase storage URL detected, adding CORS parameters');
-            // Add token and alt parameter if not present
-            if (!audio.src.includes('alt=media')) {
-              const separator = audio.src.includes('?') ? '&' : '?';
-              audio.src = `${audio.src}${separator}alt=media`;
-            }
-          }
-          
-          // Add event listener to play when loaded
-          audio.addEventListener('loadeddata', () => {
-            console.log('Audio loaded, attempting to play');
-            attemptPlay();
-          }, { once: true });
-          
-          // Set a timeout in case the loading takes too long
-          setTimeout(() => {
-            if (audio.readyState === 0) {
-              console.error('Audio failed to load within timeout');
-              
-              // Mark as not played so UI can be updated
-              setPlayedMessages(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(lastMessageWithAudio.text);
-                return newSet;
-              });
-            }
-          }, 5000); // 5 second timeout
-        } else {
-          // Audio is ready to play
-          attemptPlay();
-        }
-      } catch (error) {
-        console.error('Error setting up audio playback:', error);
-      }
-      
-      // Helper function to attempt playing with error handling
-      function attemptPlay() {
-        const playPromise = audio.play();
-        
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.error('AutoPlay failed:', error);
-            // If autoplay fails (e.g., on mobile), we'll provide visual feedback
-            // to prompt user to interact
-            
-            // We don't remove from played messages - this allows the autoplay
-            // to try again after user interaction
-            setPlayedMessages(prev => {
-              const newSet = new Set(prev);
-              newSet.delete(lastMessageWithAudio.text);
-              return newSet;
-            });
-          });
-        }
-      }
-    };
   }
   
   return (
