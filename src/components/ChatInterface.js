@@ -87,7 +87,7 @@ const ChatInterface = ({
       // Mark this message as played to avoid duplicate playback
       setPlayedMessages(prev => new Set([...prev, lastMessageWithAudio.text]));
       
-      // Get the audio element from the message
+      // Play the new audio
       const audio = lastMessageWithAudio.audio;
       setCurrentAudio(audio);
       
@@ -101,52 +101,29 @@ const ChatInterface = ({
         }));
       }
       
-      // Make sure audio is loaded before playing
-      const ensureAudioLoaded = async () => {
-        try {
-          // Make sure the audio element is properly set up
-          if (!audio || typeof audio.play !== 'function') {
-            console.error('Invalid audio element or missing play method');
-            return;
-          }
-          
-          // Set userInteracted flag to help with future autoplay attempts
-          setUserInteracted(true);
-          
-          // Ensure the audio is loaded
-          if (audio.readyState < 2) { // HAVE_CURRENT_DATA or higher
-            try {
-              await audio.load();
-            } catch (loadError) {
-              console.warn('Error preloading audio:', loadError);
-            }
-          }
-          
-          // Now try to play
-          try {
-            await audio.play();
-          } catch (playError) {
-            console.error('Playback error:', playError);
+      // Play the audio - handle mobile autoplay restrictions
+      const playAudio = () => {
+        const playPromise = audio.play();
+        
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error('AutoPlay failed:', error);
+            // If autoplay fails (e.g., on mobile), we'll provide visual feedback
+            // to prompt user to interact
             
-            // We failed to play - mark as not played so we can try again
+            // We don't remove from played messages - this allows the autoplay
+            // to try again after user interaction
             setPlayedMessages(prev => {
               const newSet = new Set(prev);
               newSet.delete(lastMessageWithAudio.text);
               return newSet;
             });
-            
-            // If autoplay is blocked, we'll need user interaction
-            if (playError.name === 'NotAllowedError') {
-              console.log('Autoplay not allowed, waiting for user interaction');
-            }
-          }
-        } catch (e) {
-          console.error('Error in audio playback:', e);
+          });
         }
       };
       
       // Try to play the audio
-      ensureAudioLoaded();
+      playAudio();
       
       // If this character has an associated video, show it
       if (videoAvailable) {

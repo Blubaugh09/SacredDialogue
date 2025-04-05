@@ -3,43 +3,22 @@
  */
 
 import { ENV, hasEnv } from '../utils/env';
-import { findExistingResponse } from '../firebase/services';
 
 /**
  * Generates a response for a biblical character based on the user's message
- * First checks for existing responses in Firestore to avoid duplicate API calls
  * 
  * @param {Object} character - The character object
  * @param {string} userMessage - The user's message
  * @param {Array} conversationHistory - Previous messages for context
- * @returns {Promise<{response: string, fromCache: boolean, audioUrl: string}>} - The response data
+ * @returns {Promise<string>} - The AI generated response
  */
 export const generateCharacterResponse = async (character, userMessage, conversationHistory) => {
   // If API key isn't available or character has no responses, use static responses
   if (!hasEnv('AI_API_KEY') || !character || !character.responses) {
-    return { 
-      response: getStaticResponse(character, userMessage),
-      fromCache: false,
-      audioUrl: null
-    };
+    return getStaticResponse(character, userMessage);
   }
   
   try {
-    // First check if we have a similar question-response pair in Firestore
-    const existingResponse = await findExistingResponse(userMessage, character.name);
-    
-    if (existingResponse) {
-      console.log('Using cached response from Firestore:', existingResponse.id);
-      return {
-        response: existingResponse.response,
-        fromCache: true,
-        audioUrl: existingResponse.audioURL
-      };
-    }
-    
-    // If no existing response, proceed with API call
-    console.log('No cached response found, making API call');
-    
     // Format conversation for the AI
     const formattedConversation = formatConversationForAI(character, conversationHistory);
     
@@ -74,27 +53,15 @@ export const generateCharacterResponse = async (character, userMessage, conversa
     const data = await response.json();
     
     if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-      return {
-        response: data.choices[0].message.content,
-        fromCache: false,
-        audioUrl: null
-      };
+      return data.choices[0].message.content;
     } else {
       console.error('Unexpected API response:', data);
-      return {
-        response: getStaticResponse(character, userMessage),
-        fromCache: false,
-        audioUrl: null
-      };
+      return getStaticResponse(character, userMessage);
     }
   } catch (error) {
-    console.error('Error generating response:', error);
-    // Fallback to static responses if API or Firestore fails
-    return {
-      response: getStaticResponse(character, userMessage),
-      fromCache: false,
-      audioUrl: null
-    };
+    console.error('Error calling AI API:', error);
+    // Fallback to static responses if API fails
+    return getStaticResponse(character, userMessage);
   }
 };
 

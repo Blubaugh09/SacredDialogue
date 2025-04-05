@@ -3,7 +3,6 @@
  */
 
 import { ENV } from '../utils/env';
-import { uploadAudioToStorage, getAudioBlobFromFirebase } from '../firebase/services';
 
 // Audio cache to store generated audio blobs
 const audioCache = new Map();
@@ -14,16 +13,15 @@ const audioCache = new Map();
  * @param {string} text - The text to convert to speech
  * @param {string} voice - The voice to use (default: 'onyx')
  * @param {number} speed - The speaking speed (1.0 is normal, higher is faster)
- * @param {string} characterName - The name of the character for storage purposes
- * @returns {Promise<{blob: Blob, url: string}>} - Audio blob and Firebase URL
+ * @returns {Promise<Blob>} - Audio blob that can be played
  */
-export const textToSpeech = async (text, voice = 'onyx', speed = 1.3, characterName = null) => {
+export const textToSpeech = async (text, voice = 'onyx', speed = 1.3) => {
   // Create a cache key from the text, voice, and speed
   const cacheKey = `${text}|${voice}|${speed}`;
   
   // Check if we already have this audio in the cache
   if (audioCache.has(cacheKey)) {
-    return { blob: audioCache.get(cacheKey), url: null };
+    return audioCache.get(cacheKey);
   }
   
   try {
@@ -53,18 +51,7 @@ export const textToSpeech = async (text, voice = 'onyx', speed = 1.3, characterN
     // Cache the audio for future use
     audioCache.set(cacheKey, audioBlob);
     
-    // If character name is provided, upload to Firebase Storage
-    let firebaseUrl = null;
-    if (characterName) {
-      try {
-        firebaseUrl = await uploadAudioToStorage(audioBlob, characterName);
-      } catch (storageError) {
-        console.error('Firebase Storage upload error:', storageError);
-        // Continue with local blob even if Firebase upload fails
-      }
-    }
-    
-    return { blob: audioBlob, url: firebaseUrl };
+    return audioBlob;
   } catch (error) {
     console.error('Text-to-speech error:', error);
     throw error;
@@ -202,7 +189,7 @@ export const prepareGreetingAudio = async (character) => {
   
   try {
     const voice = getVoiceForCharacter(character);
-    const { blob: audioBlob } = await textToSpeech(character.greeting, voice);
+    const audioBlob = await textToSpeech(character.greeting, voice);
     
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
@@ -216,49 +203,5 @@ export const prepareGreetingAudio = async (character) => {
   } catch (error) {
     console.error('Failed to prepare greeting audio:', error);
     return null;
-  }
-};
-
-/**
- * Fetches an audio file from a URL and converts it to a blob
- * This helps overcome CORS and format issues with Firebase Storage URLs
- * 
- * @param {string} url - The URL of the audio file
- * @returns {Promise<Blob>} - Audio blob that can be played
- */
-export const fetchAudioAsBlob = async (url) => {
-  try {
-    console.log('Attempting to fetch audio from URL:', url);
-    
-    // Check if it's a Firebase Storage URL
-    if (url.includes('firebasestorage.googleapis.com')) {
-      console.log('Detected Firebase Storage URL, using SDK to fetch');
-      // Use Firebase SDK directly to avoid CORS issues
-      return await getAudioBlobFromFirebase(url);
-    }
-    
-    // For non-Firebase URLs, use regular fetch with cache busting
-    const cacheBustUrl = `${url}&_cb=${Date.now()}`;
-    
-    const response = await fetch(cacheBustUrl, {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-cache',
-      credentials: 'same-origin',
-      headers: {
-        'Accept': 'audio/mpeg, audio/*;q=0.8'
-      },
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
-    }
-    
-    const blob = await response.blob();
-    console.log('Successfully fetched audio blob, size:', blob.size, 'bytes, type:', blob.type);
-    return blob;
-  } catch (error) {
-    console.error('Error fetching audio as blob:', error);
-    throw error;
   }
 }; 
