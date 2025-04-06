@@ -1,9 +1,8 @@
-.shared-conversation-container {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem;
-  background-color: #fefbf6;
+.shared-message-container {
   min-height: 100vh;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
   font-family: 'Georgia', serif;
 }
 
@@ -14,6 +13,10 @@
   margin-bottom: 2rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid #e9d5a1;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .shared-header h1 {
@@ -40,6 +43,9 @@
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .question-card, .response-card {
@@ -49,12 +55,12 @@
 }
 
 .question-card {
-  background-color: #f5ebd7;
+  background-color: rgba(245, 235, 215, 0.95);
   border-left: 4px solid #d4a76a;
 }
 
 .response-card {
-  background-color: #fff;
+  background-color: rgba(255, 255, 255, 0.95);
   border-left: 4px solid #8b5a2b;
 }
 
@@ -98,6 +104,9 @@
   color: #8d8d8d;
   font-size: 0.85rem;
   font-style: italic;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 8px;
+  border-radius: 4px;
 }
 
 .loading-spinner {
@@ -107,11 +116,15 @@
   height: 200px;
   font-size: 1.2rem;
   color: #8b5a2b;
+  background-color: rgba(255, 255, 255, 0.8);
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
 .error-message {
   padding: 2rem;
-  background-color: #fff3f3;
+  background-color: rgba(255, 243, 243, 0.95);
   border: 1px solid #ffcaca;
   border-radius: 8px;
   color: #d83030;
@@ -119,8 +132,24 @@
   margin-bottom: 2rem;
 }
 
+.video-container {
+  max-width: 800px;
+  max-height: 40vh;
+  margin: 0 auto 2rem auto;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.character-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
 @media (max-width: 600px) {
-  .shared-conversation-container {
+  .shared-message-container {
     padding: 1rem;
   }
   

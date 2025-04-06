@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Send, Volume2, VolumeX, Mic, MicOff, Repeat, Video, ArrowLeft, Clock, BookOpen, Share2 } from 'lucide-react';
+import { Send, Volume2, VolumeX, Mic, MicOff, Repeat, Video, ArrowLeft, Clock, BookOpen, Share2, Pause } from 'lucide-react';
 import { startRecording, stopRecording, speechToText } from '../services/audioService';
+import { createShareableConversation } from '../firebase/services';
 
 const ChatInterface = ({ 
   selectedCharacter, 
@@ -370,9 +371,9 @@ const ChatInterface = ({
   };
   
   // Add this function to generate share links for messages
-  const generateShareLink = (characterName, conversationId) => {
+  const generateShareLink = (characterName, shareId) => {
     const baseUrl = window.location.origin;
-    return `${baseUrl}/share/${characterName}/${conversationId}`;
+    return `${baseUrl}/s/${characterName}/${shareId}`;
   };
 
   // Add this function to copy text to clipboard
@@ -388,39 +389,51 @@ const ChatInterface = ({
 
   // Function to handle sharing a conversation
   const handleShare = async (message) => {
-    // Only character messages with IDs can be shared
+    // Only character messages can be shared
     if (message.type !== 'character') return;
     
-    // Use either conversationId from Firebase or message id as fallback
-    const messageId = message.conversationId || message.id;
-    
-    if (!messageId) {
-      console.error('No valid ID found for sharing this message');
-      setShareTooltip('Cannot share this message');
+    try {
+      setShareTooltip('Creating share link...');
       setShowShareTooltip(true);
       
-      // Hide the tooltip after 3 seconds
-      setTimeout(() => {
-        setShowShareTooltip(false);
-      }, 3000);
+      // First try to get the audio URL from the message
+      let audioUrl = null;
+      if (message.audio && message.audio.src) {
+        // If it's an object URL, we need to use the existing audioUrl field
+        if (message.audio.src.startsWith('blob:')) {
+          // Try to get the Firebase audioUrl (if any)
+          audioUrl = message.audioUrl;
+        } else {
+          // It's already a remote URL
+          audioUrl = message.audio.src;
+        }
+      }
       
-      return;
+      // Create a shareable version of this conversation
+      const shareId = await createShareableConversation(
+        selectedCharacter.name,
+        // Find the user message that came before this response
+        messages.find(m => m.id === message.replyToId)?.text || "Unknown question",
+        message.text,
+        audioUrl
+      );
+      
+      // Generate a share link using the character name and share ID
+      const shareLink = generateShareLink(selectedCharacter.name, shareId);
+      
+      // Copy the link to clipboard
+      const copied = await copyToClipboard(shareLink);
+      
+      // Show feedback to the user
+      if (copied) {
+        setShareTooltip('Link copied to clipboard!');
+      } else {
+        setShareTooltip('Failed to copy link. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error creating share link:', error);
+      setShareTooltip('Failed to create share link. Please try again.');
     }
-    
-    // Generate a share link using the character name and message ID
-    const shareLink = generateShareLink(selectedCharacter.name, messageId);
-    
-    // Copy the link to clipboard
-    const copied = await copyToClipboard(shareLink);
-    
-    // Show feedback to the user
-    if (copied) {
-      setShareTooltip('Link copied to clipboard!');
-    } else {
-      setShareTooltip('Failed to copy link. Please try again.');
-    }
-    
-    setShowShareTooltip(true);
     
     // Hide the tooltip after 3 seconds
     setTimeout(() => {

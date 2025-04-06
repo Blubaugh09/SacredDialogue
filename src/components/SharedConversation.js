@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getConversationById } from '../firebase/services';
 import { createAudioFromUrl } from '../utils/audioUtils';
+import { Play, Pause } from 'lucide-react';
 import '../styles/SharedConversation.css';
 
 const SharedConversation = () => {
@@ -105,8 +106,12 @@ const SharedConversation = () => {
             <button 
               className="audio-button" 
               onClick={handlePlayAudio}
+              aria-label={isPlaying ? 'Pause audio' : 'Play audio'}
             >
-              {isPlaying ? 'Pause Audio' : 'Play Audio'}
+              {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+              <span className="audio-button-text">
+                {isPlaying ? 'Pause' : 'Play'} Audio
+              </span>
             </button>
           )}
         </div>

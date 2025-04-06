@@ -4,6 +4,7 @@ import CharacterSelection from './components/CharacterSelection';
 import ChatInterface from './components/ChatInterface';
 import StoryMode from './components/StoryMode';
 import SharedConversation from './components/SharedConversation';
+import SharedMessage from './components/SharedMessage';
 import useCharacterAnimation from './hooks/useCharacterAnimation';
 import { generateCharacterResponse, generateStoryResponse, getSuggestionUpdates } from './services/aiService';
 import { textToSpeech, getVoiceForCharacter, prepareGreetingAudio } from './services/audioService';
@@ -415,6 +416,7 @@ function App() {
                 
                 if (messageIndex !== -1) {
                   updatedMessages[messageIndex].conversationId = savedConversation.id;
+                  updatedMessages[messageIndex].audioUrl = savedConversation.audioUrl;
                   setMessages(updatedMessages);
                 }
               } else {
@@ -428,6 +430,7 @@ function App() {
                 
                 if (messageIndex !== -1) {
                   updatedMessages[messageIndex].conversationId = existingConversation.id;
+                  updatedMessages[messageIndex].audioUrl = existingConversation.audioUrl;
                   setMessages(updatedMessages);
                 }
               }
@@ -449,7 +452,9 @@ function App() {
             text: response,
             audio: audio, // Attach the audio to the message (might be null if there was an error)
             requestStartTime: requestStartTime, // Track when the request started
-            isCached: true // Mark as cached response
+            isCached: true, // Mark as cached response
+            replyToId: userMessageId, // Track which user message this is replying to
+            audioUrl: cachedConversation.audioUrl // Store the original audio URL
           }
         ]);
         
@@ -532,7 +537,8 @@ function App() {
             type: 'character', 
             text: response,
             audio: audio, // Attach the audio to the message
-            requestStartTime: requestStartTime // Track when the request started
+            requestStartTime: requestStartTime, // Track when the request started
+            replyToId: userMessageId // Track which user message this is replying to
           }
         ]);
         
@@ -563,6 +569,7 @@ function App() {
             
             if (messageIndex !== -1) {
               updatedMessages[messageIndex].conversationId = savedConversation.id;
+              updatedMessages[messageIndex].audioUrl = savedConversation.audioUrl;
               setMessages(updatedMessages);
             }
           } else {
@@ -576,6 +583,7 @@ function App() {
             
             if (messageIndex !== -1) {
               updatedMessages[messageIndex].conversationId = existingConversation.id;
+              updatedMessages[messageIndex].audioUrl = existingConversation.audioUrl;
               setMessages(updatedMessages);
             }
           }
@@ -867,6 +875,7 @@ function App() {
           </>
         } />
         <Route path="/share/:characterName/:conversationId" element={<SharedConversation />} />
+        <Route path="/s/:characterName/:shareId" element={<SharedMessage />} />
       </Routes>
     </div>
   );

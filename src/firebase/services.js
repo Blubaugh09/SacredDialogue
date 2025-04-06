@@ -244,4 +244,69 @@ export const getConversationById = async (characterName, conversationId) => {
     console.error('Error getting conversation by ID:', error);
     return null;
   }
+};
+
+/**
+ * Creates a shareable version of a conversation
+ * This saves the essential data in a dedicated 'shares' collection for reliability
+ * 
+ * @param {string} characterName - The name of the character
+ * @param {string} userMessage - The user's message
+ * @param {string} aiResponse - The AI's response
+ * @param {string} audioUrl - URL to the audio file (if any)
+ * @returns {Promise<string>} - The share ID
+ */
+export const createShareableConversation = async (characterName, userMessage, aiResponse, audioUrl) => {
+  try {
+    // Create share data object with all necessary information
+    const shareData = {
+      characterName,
+      userMessage,
+      aiResponse,
+      audioUrl,
+      timestamp: serverTimestamp(),
+    };
+
+    // Save to dedicated 'shares' collection
+    const sharesCollection = collection(db, 'shares');
+    const docRef = await addDoc(sharesCollection, shareData);
+    
+    console.log('Created shareable conversation with ID:', docRef.id);
+    
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating shareable conversation:', error);
+    throw error;
+  }
+};
+
+/**
+ * Retrieves a shared conversation by its ID
+ * 
+ * @param {string} shareId - The ID of the shared conversation
+ * @returns {Promise<Object|null>} - The shared conversation data or null if not found
+ */
+export const getSharedConversation = async (shareId) => {
+  try {
+    const shareRef = doc(db, 'shares', shareId);
+    const shareDoc = await getDoc(shareRef);
+    
+    if (!shareDoc.exists()) {
+      console.log('Shared conversation not found:', shareId);
+      return null;
+    }
+    
+    // Get share data
+    const shareData = {
+      id: shareDoc.id,
+      ...shareDoc.data(),
+      // Convert server timestamp to JS Date if it exists
+      timestamp: shareDoc.data().timestamp?.toDate?.() || null
+    };
+    
+    return shareData;
+  } catch (error) {
+    console.error('Error getting shared conversation:', error);
+    return null;
+  }
 }; 
