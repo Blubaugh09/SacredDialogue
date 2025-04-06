@@ -187,23 +187,8 @@ export const findSimilarConversation = async (characterName, question, similarit
     if (exactMatch) {
       console.log('Found exact match for question:', question);
       
-      // Validate the audio URL if it exists
-      if (exactMatch.audioUrl) {
-        try {
-          // Check if the URL is accessible by making a HEAD request
-          const response = await fetch(exactMatch.audioUrl, { method: 'HEAD' });
-          if (!response.ok) {
-            console.log('Cached audio URL is no longer valid, will regenerate audio');
-            // If URL is no longer valid, set it to null so new audio will be generated
-            exactMatch.audioUrl = null;
-          }
-        } catch (error) {
-          console.error('Error checking cached audio URL:', error);
-          // If there's an error accessing the URL, set it to null
-          exactMatch.audioUrl = null;
-        }
-      }
-      
+      // Return the exact match immediately without validation
+      // This avoids the slow HEAD request to Firebase Storage
       return exactMatch;
     }
     
@@ -212,23 +197,7 @@ export const findSimilarConversation = async (characterName, question, similarit
       if (conv.message && areSimilarQuestions(question, conv.message, similarityThreshold)) {
         console.log('Found similar question:', conv.message, 'for', question);
         
-        // Validate the audio URL if it exists
-        if (conv.audioUrl) {
-          try {
-            // Check if the URL is accessible by making a HEAD request
-            const response = await fetch(conv.audioUrl, { method: 'HEAD' });
-            if (!response.ok) {
-              console.log('Cached audio URL is no longer valid, will regenerate audio');
-              // If URL is no longer valid, set it to null so new audio will be generated
-              conv.audioUrl = null;
-            }
-          } catch (error) {
-            console.error('Error checking cached audio URL:', error);
-            // If there's an error accessing the URL, set it to null
-            conv.audioUrl = null;
-          }
-        }
-        
+        // Return the similar match immediately without validation
         return conv;
       }
     }

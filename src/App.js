@@ -419,6 +419,17 @@ function App() {
                 }
               } else {
                 console.log('Conversation already exists, not duplicating:', existingConversation);
+                
+                // Even for existing conversations, store the ID with the message for sharing
+                const updatedMessages = [...messages];
+                const messageIndex = updatedMessages.findIndex(msg => 
+                  msg.type === 'character' && msg.text === response
+                );
+                
+                if (messageIndex !== -1) {
+                  updatedMessages[messageIndex].conversationId = existingConversation.id;
+                  setMessages(updatedMessages);
+                }
               }
             } catch (error) {
               console.error('Error saving conversation to Firebase:', error);
@@ -556,6 +567,17 @@ function App() {
             }
           } else {
             console.log('Conversation already exists, not duplicating:', existingConversation);
+            
+            // Even for existing conversations, store the ID with the message for sharing
+            const updatedMessages = [...messages];
+            const messageIndex = updatedMessages.findIndex(msg => 
+              msg.type === 'character' && msg.text === response
+            );
+            
+            if (messageIndex !== -1) {
+              updatedMessages[messageIndex].conversationId = existingConversation.id;
+              setMessages(updatedMessages);
+            }
           }
         } catch (error) {
           console.error('Error saving conversation to Firebase:', error);
