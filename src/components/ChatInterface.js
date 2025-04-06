@@ -191,8 +191,8 @@ const ChatInterface = ({
   useEffect(() => {
     return () => {
       if (currentAudio) {
+        // Just pause the audio but don't reset its position or state
         currentAudio.pause();
-        currentAudio.onended = null;
       }
       
       // Make sure to stop recording if component unmounts
@@ -293,9 +293,35 @@ const ChatInterface = ({
     }
     
     try {
-      // Stop any currently playing audio
-      if (currentAudio) {
+      // Check if this is the currently tracked audio
+      const isSameAudio = currentAudio === message.audio;
+      
+      // If already playing this audio, just pause it
+      if (isSameAudio && isPlaying === message.id) {
         currentAudio.pause();
+        setIsPlaying(null);
+        return;
+      }
+      
+      // If it's the same audio but paused, resume it
+      if (isSameAudio) {
+        const playPromise = currentAudio.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setIsPlaying(message.id);
+            })
+            .catch(error => {
+              console.error('Failed to resume audio:', error);
+            });
+        }
+        return;
+      }
+      
+      // Otherwise, stop any currently playing audio
+      if (currentAudio && currentAudio !== message.audio) {
+        currentAudio.pause();
+        // Don't reset currentTime here, we want to keep position of previous audio
         currentAudio.onended = null;
       }
       
@@ -314,14 +340,7 @@ const ChatInterface = ({
       // Set this as the current audio
       setCurrentAudio(audio);
       
-      // Track the currently playing message
-      setPlayedMessages(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(message.text);
-        return newSet;
-      });
-      
-      // Add error handling to the audio element
+      // Setup event handlers
       audio.onerror = (e) => {
         console.error('Error playing message audio:', e);
         alert('Sorry, there was an error playing the audio. Please try again.');
@@ -329,31 +348,38 @@ const ChatInterface = ({
       
       // Handle play/pause state
       audio.onplay = () => setIsPlaying(message.id);
-      audio.onpause = () => setIsPlaying(null);
+      audio.onpause = () => {
+        // Only set isPlaying to null if we actually paused (not just seeking)
+        if (!audio.seeking) setIsPlaying(null);
+      };
       audio.onended = () => {
         setIsPlaying(null);
-        // If the user has interacted with the page, try to play
-        if (userInteracted) {
-          setPlayedMessages(prev => {
-            const newSet = new Set(prev);
-            newSet.add(message.text);
-            return newSet;
-          });
-        }
+        audio.currentTime = 0; // Reset to beginning when ended
+        
+        setPlayedMessages(prev => {
+          const newSet = new Set(prev);
+          newSet.add(message.text);
+          return newSet;
+        });
       };
       
-      // Check if already playing this message
-      if (isPlaying === message.id) {
-        // If the same message is already playing, pause it
-        audio.pause();
-        setIsPlaying(null);
-      } else {
-        // If the audio is ready to play
-        const attemptPlay = () => {
-          const playPromise = audio.play();
-          
-          if (playPromise !== undefined) {
-            playPromise.catch(error => {
+      // Attempt to play the audio
+      const attemptPlay = () => {
+        const playPromise = audio.play();
+        
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setIsPlaying(message.id);
+              
+              // Remove from played messages since we're playing it now
+              setPlayedMessages(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(message.text);
+                return newSet;
+              });
+            })
+            .catch(error => {
               console.error('Failed to play message audio:', error);
               
               // If this is the first interaction, it might be an autoplay restriction
@@ -361,29 +387,28 @@ const ChatInterface = ({
                 alert('Please interact with the page to enable audio playback.');
               }
             });
-          }
-        };
-        
-        // Check if the audio is valid and has a source before playing
-        if (audio.readyState === 0) {
-          console.log('Message audio not ready yet, waiting for loadeddata event');
-          
-          // Add event listener to play when loaded
-          audio.addEventListener('loadeddata', () => {
-            console.log('Message audio loaded, attempting to play');
-            attemptPlay();
-          }, { once: true });
-          
-          // Set a timeout in case the loading takes too long
-          setTimeout(() => {
-            if (audio.readyState === 0) {
-              console.error('Message audio failed to load within timeout');
-            }
-          }, 5000); // 5 second timeout
-        } else {
-          // Audio is ready to play
-          attemptPlay();
         }
+      };
+      
+      // Check if the audio is valid and has a source before playing
+      if (audio.readyState === 0) {
+        console.log('Message audio not ready yet, waiting for loadeddata event');
+        
+        // Add event listener to play when loaded
+        audio.addEventListener('loadeddata', () => {
+          console.log('Message audio loaded, attempting to play');
+          attemptPlay();
+        }, { once: true });
+        
+        // Set a timeout in case the loading takes too long
+        setTimeout(() => {
+          if (audio.readyState === 0) {
+            console.error('Message audio failed to load within timeout');
+          }
+        }, 5000); // 5 second timeout
+      } else {
+        // Audio is ready to play
+        attemptPlay();
       }
       
       // Set user interacted to true
