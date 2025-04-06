@@ -70,6 +70,7 @@ const SharedConversation = () => {
         }
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [characterName, conversationId]);
   
   const handlePlayAudio = () => {

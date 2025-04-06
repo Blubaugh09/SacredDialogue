@@ -91,6 +91,7 @@ const SharedMessage = () => {
         }
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shareId]);
   
   const toggleAudio = () => {
