@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Send, Volume2, VolumeX, Mic, MicOff, Repeat, Video, ArrowLeft, Clock, BookOpen, Share2 } from 'lucide-react';
+import { Send, Volume2, VolumeX, Mic, MicOff, Repeat, Video, ArrowLeft, Clock, BookOpen, Share2, Play, Pause } from 'lucide-react';
 import { startRecording, stopRecording, speechToText } from '../services/audioService';
 import { createShareableConversation } from '../firebase/services';
 
@@ -30,6 +30,7 @@ const ChatInterface = ({
   const [userInteracted, setUserInteracted] = useState(false);
   const [shareTooltip, setShareTooltip] = useState('');
   const [showShareTooltip, setShowShareTooltip] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(null);
   
   // Check if video exists for the selected character
   useEffect(() => {
@@ -313,55 +314,77 @@ const ChatInterface = ({
       // Set this as the current audio
       setCurrentAudio(audio);
       
+      // Track the currently playing message
+      setPlayedMessages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(message.text);
+        return newSet;
+      });
+      
       // Add error handling to the audio element
       audio.onerror = (e) => {
         console.error('Error playing message audio:', e);
         alert('Sorry, there was an error playing the audio. Please try again.');
       };
       
-      // Check if the audio is valid and has a source before playing
-      if (audio.readyState === 0) {
-        console.log('Message audio not ready yet, waiting for loadeddata event');
-        
-        // Add event listener to play when loaded
-        audio.addEventListener('loadeddata', () => {
-          console.log('Message audio loaded, attempting to play');
-          attemptPlay();
-        }, { once: true });
-        
-        // Set a timeout in case the loading takes too long
-        setTimeout(() => {
-          if (audio.readyState === 0) {
-            console.error('Message audio failed to load within timeout');
-          }
-        }, 5000); // 5 second timeout
-      } else {
-        // Audio is ready to play
-        attemptPlay();
-      }
-      
-      // Helper function to attempt playing with error handling
-      function attemptPlay() {
-        const playPromise = audio.play();
-        
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.error('Failed to play message audio:', error);
-            
-            // If this is the first interaction, it might be an autoplay restriction
-            if (!userInteracted) {
-              alert('Please interact with the page to enable audio playback.');
-            }
+      // Handle play/pause state
+      audio.onplay = () => setIsPlaying(message.id);
+      audio.onpause = () => setIsPlaying(null);
+      audio.onended = () => {
+        setIsPlaying(null);
+        // If the user has interacted with the page, try to play
+        if (userInteracted) {
+          setPlayedMessages(prev => {
+            const newSet = new Set(prev);
+            newSet.add(message.text);
+            return newSet;
           });
         }
-      }
+      };
       
-      // Reset the played status for this message
-      setPlayedMessages(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(message.text);
-        return newSet;
-      });
+      // Check if already playing this message
+      if (isPlaying === message.id) {
+        // If the same message is already playing, pause it
+        audio.pause();
+        setIsPlaying(null);
+      } else {
+        // If the audio is ready to play
+        const attemptPlay = () => {
+          const playPromise = audio.play();
+          
+          if (playPromise !== undefined) {
+            playPromise.catch(error => {
+              console.error('Failed to play message audio:', error);
+              
+              // If this is the first interaction, it might be an autoplay restriction
+              if (!userInteracted) {
+                alert('Please interact with the page to enable audio playback.');
+              }
+            });
+          }
+        };
+        
+        // Check if the audio is valid and has a source before playing
+        if (audio.readyState === 0) {
+          console.log('Message audio not ready yet, waiting for loadeddata event');
+          
+          // Add event listener to play when loaded
+          audio.addEventListener('loadeddata', () => {
+            console.log('Message audio loaded, attempting to play');
+            attemptPlay();
+          }, { once: true });
+          
+          // Set a timeout in case the loading takes too long
+          setTimeout(() => {
+            if (audio.readyState === 0) {
+              console.error('Message audio failed to load within timeout');
+            }
+          }, 5000); // 5 second timeout
+        } else {
+          // Audio is ready to play
+          attemptPlay();
+        }
+      }
       
       // Set user interacted to true
       setUserInteracted(true);
@@ -467,8 +490,17 @@ const ChatInterface = ({
             <button 
               className="text-xs text-amber-700 flex items-center hover:text-amber-500 transition-colors" 
               onClick={() => playMessageAudio(message)}
+              title={isPlaying === message.id ? "Pause audio" : "Play audio"}
             >
-              <Repeat size={12} className="mr-1" /> Hear again
+              {isPlaying === message.id ? (
+                <>
+                  <Pause size={12} className="mr-1" /> Pause
+                </>
+              ) : (
+                <>
+                  <Play size={12} className="mr-1" /> Play
+                </>
+              )}
             </button>
           )}
           
