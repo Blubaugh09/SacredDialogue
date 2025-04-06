@@ -107,6 +107,16 @@ const ChatInterface = ({
         }));
       }
       
+      // Set up audio event handlers
+      audio.onplay = () => setIsPlaying(lastMessageWithAudio.id);
+      audio.onpause = () => {
+        // Only set isPlaying to null if we actually paused (not just seeking)
+        if (!audio.seeking) setIsPlaying(null);
+      };
+      audio.onended = () => {
+        setIsPlaying(null);
+      };
+      
       // Play the audio - handle mobile autoplay restrictions
       const playAudio = () => {
         if (!audio || !audio.src) {
@@ -151,19 +161,27 @@ const ChatInterface = ({
           const playPromise = audio.play();
           
           if (playPromise !== undefined) {
-            playPromise.catch(error => {
-              console.error('AutoPlay failed:', error);
-              // If autoplay fails (e.g., on mobile), we'll provide visual feedback
-              // to prompt user to interact
-              
-              // We don't remove from played messages - this allows the autoplay
-              // to try again after user interaction
-              setPlayedMessages(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(lastMessageWithAudio.text);
-                return newSet;
+            playPromise
+              .then(() => {
+                // Set isPlaying when playback starts successfully
+                setIsPlaying(lastMessageWithAudio.id);
+              })
+              .catch(error => {
+                console.error('AutoPlay failed:', error);
+                // If autoplay fails (e.g., on mobile), we'll provide visual feedback
+                // to prompt user to interact
+                
+                // We don't remove from played messages - this allows the autoplay
+                // to try again after user interaction
+                setPlayedMessages(prev => {
+                  const newSet = new Set(prev);
+                  newSet.delete(lastMessageWithAudio.text);
+                  return newSet;
+                });
+                
+                // Reset isPlaying if playback fails
+                setIsPlaying(null);
               });
-            });
           }
         }
       };
@@ -185,6 +203,7 @@ const ChatInterface = ({
         }, 100);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, isAudioEnabled, currentAudio, playedMessages, videoAvailable, userInteracted]);
   
   // Clean up audio and video on unmount
