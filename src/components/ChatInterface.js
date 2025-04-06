@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Send, Volume2, VolumeX, Mic, MicOff, Repeat, Video, ArrowLeft, Clock, BookOpen, Share2, Play, Pause } from 'lucide-react';
+import { Send, Volume2, VolumeX, Mic, MicOff, Video, ArrowLeft, Clock, BookOpen, Share2, Play, Pause } from 'lucide-react';
 import { startRecording, stopRecording, speechToText } from '../services/audioService';
 import { createShareableConversation } from '../firebase/services';
 
