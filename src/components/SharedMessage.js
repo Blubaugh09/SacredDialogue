@@ -50,12 +50,18 @@ const SharedMessage = () => {
         
         // Create audio player if there's an audio URL
         if (sharedData.audioUrl) {
-          const audio = createAudioFromUrl(sharedData.audioUrl);
-          setAudioPlayer(audio);
-          
-          audio.addEventListener('play', () => setIsPlaying(true));
-          audio.addEventListener('pause', () => setIsPlaying(false));
-          audio.addEventListener('ended', () => setIsPlaying(false));
+          try {
+            const audio = createAudioFromUrl(sharedData.audioUrl);
+            if (audio) {
+              // Make sure it's a valid audio element before adding event listeners
+              audio.addEventListener('play', () => setIsPlaying(true));
+              audio.addEventListener('pause', () => setIsPlaying(false));
+              audio.addEventListener('ended', () => setIsPlaying(false));
+              setAudioPlayer(audio);
+            }
+          } catch (err) {
+            console.error('Error creating audio element:', err);
+          }
         }
         
         setLoading(false);
@@ -70,24 +76,36 @@ const SharedMessage = () => {
     
     // Cleanup function
     return () => {
-      if (audioPlayer) {
-        audioPlayer.pause();
-        audioPlayer.removeEventListener('play', () => setIsPlaying(true));
-        audioPlayer.removeEventListener('pause', () => setIsPlaying(false));
-        audioPlayer.removeEventListener('ended', () => setIsPlaying(false));
+      if (audioPlayer && typeof audioPlayer.pause === 'function') {
+        try {
+          audioPlayer.pause();
+          
+          // Only try to remove event listeners if they were added successfully
+          if (audioPlayer.removeEventListener) {
+            audioPlayer.removeEventListener('play', () => setIsPlaying(true));
+            audioPlayer.removeEventListener('pause', () => setIsPlaying(false));
+            audioPlayer.removeEventListener('ended', () => setIsPlaying(false));
+          }
+        } catch (err) {
+          console.error('Error cleaning up audio player:', err);
+        }
       }
     };
-  }, [shareId, audioPlayer]);
+  }, [shareId]);
   
   const toggleAudio = () => {
     if (!audioPlayer) return;
     
-    if (isPlaying) {
-      audioPlayer.pause();
-    } else {
-      audioPlayer.play().catch(error => {
-        console.error('Error playing audio:', error);
-      });
+    try {
+      if (isPlaying && typeof audioPlayer.pause === 'function') {
+        audioPlayer.pause();
+      } else if (typeof audioPlayer.play === 'function') {
+        audioPlayer.play().catch(error => {
+          console.error('Error playing audio:', error);
+        });
+      }
+    } catch (err) {
+      console.error('Error toggling audio:', err);
     }
   };
   

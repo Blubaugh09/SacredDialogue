@@ -26,56 +26,40 @@ export const fixFirebaseStorageUrl = (url) => {
 };
 
 /**
- * Create an audio element from a URL, with special handling for Firebase Storage
+ * Creates an audio element from a URL, handling Firebase Storage URLs
  * 
  * @param {string} url - The URL to the audio file
- * @param {Function} onEnded - Callback for when audio ends
- * @returns {Promise<HTMLAudioElement|null>} - Promise resolving to an audio element or null
+ * @returns {HTMLAudioElement} - The prepared audio element
  */
-export const createAudioFromUrl = (url, onEnded = () => {}) => {
-  return new Promise((resolve, reject) => {
-    if (!url) {
-      console.error('No URL provided for audio');
-      return resolve(null);
-    }
+export const createAudioFromUrl = (url) => {
+  if (!url) {
+    console.error('Invalid URL provided to createAudioFromUrl');
+    return null;
+  }
+
+  try {
+    // Fix Firebase storage URLs if needed
+    const fixedUrl = fixFirebaseStorageUrl(url);
+    console.log('Fixing Firebase storage URL');
     
-    try {
-      // Fix the URL if it's from Firebase Storage
-      const fixedUrl = fixFirebaseStorageUrl(url);
-      
-      // Create audio element
-      const audio = new Audio();
-      
-      // Set up event listeners
-      audio.addEventListener('canplaythrough', () => {
-        console.log('Audio can play through');
-        resolve(audio);
-      }, { once: true });
-      
-      audio.addEventListener('error', (error) => {
-        console.error('Error loading audio:', error);
-        reject(error);
-      }, { once: true });
-      
-      // Set onended callback
-      audio.onended = onEnded;
-      
-      // Set the source last, after all event listeners
-      audio.src = fixedUrl;
-      audio.load();
-      
-      // Timeout to prevent hanging
-      setTimeout(() => {
-        if (audio.readyState === 0) {
-          console.warn('Audio loading timed out, trying to resolve anyway');
-          resolve(audio);
-        }
-      }, 5000);
-    } catch (error) {
-      console.error('Error creating audio element:', error);
-      reject(error);
-    }
-  });
+    // Create a new audio element
+    const audio = new Audio(fixedUrl);
+    
+    // Add error handling
+    audio.onerror = (e) => {
+      console.error('Error with audio playback:', e);
+    };
+    
+    // Add loadeddata handler to check if audio is valid
+    audio.addEventListener('loadeddata', () => {
+      console.log('Audio can play through');
+    });
+    
+    return audio;
+  } catch (error) {
+    console.error('Error creating audio from URL:', error);
+    return null;
+  }
 };
 
 /**
