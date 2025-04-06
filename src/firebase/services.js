@@ -39,6 +39,9 @@ export const saveConversation = async (characterName, userMessage, aiResponse, a
       character: characterName,
       message: userMessage,
       response: aiResponse,
+      // Add fields with the same names used in SharedConversation.js
+      userMessage: userMessage,
+      aiResponse: aiResponse,
       timestamp: serverTimestamp(),
     };
 
@@ -256,11 +259,15 @@ export const getConversationById = async (characterName, conversationId) => {
     }
     
     // Get conversation data
+    const data = conversationDoc.data();
     const conversationData = {
       id: conversationDoc.id,
-      ...conversationDoc.data(),
+      ...data,
+      // Ensure we have both naming conventions for backward compatibility
+      userMessage: data.userMessage || data.message,
+      aiResponse: data.aiResponse || data.response,
       // Convert server timestamp to JS Date if it exists
-      timestamp: conversationDoc.data().timestamp?.toDate?.() || null
+      timestamp: data.timestamp?.toDate?.() || null
     };
     
     return conversationData;

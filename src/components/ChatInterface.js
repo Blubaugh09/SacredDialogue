@@ -391,12 +391,12 @@ const ChatInterface = ({
     // Only character messages with IDs can be shared
     if (message.type !== 'character') return;
     
-    // Use either the stored conversationId or the message id
-    const messageId = message.conversationId || message.id;
+    // Only use the stored conversationId from Firebase, not the message id
+    const conversationId = message.conversationId;
     
-    if (!messageId) {
-      console.error('No valid ID found for sharing this message');
-      setShareTooltip('Cannot share this message');
+    if (!conversationId) {
+      console.error('No conversationId found for sharing this message');
+      setShareTooltip('Cannot share this message yet. Please try again later.');
       setShowShareTooltip(true);
       
       // Hide the tooltip after 3 seconds
@@ -407,8 +407,8 @@ const ChatInterface = ({
       return;
     }
     
-    // Generate a share link using the character name and message ID
-    const shareLink = generateShareLink(selectedCharacter.name, messageId);
+    // Generate a share link using the character name and conversationId
+    const shareLink = generateShareLink(selectedCharacter.name, conversationId);
     
     // Copy the link to clipboard
     const copied = await copyToClipboard(shareLink);
@@ -459,7 +459,7 @@ const ChatInterface = ({
             </button>
           )}
           
-          {message.type === 'character' && (message.conversationId || message.id) && (
+          {message.type === 'character' && message.conversationId && (
             <button 
               className="text-xs text-amber-700 flex items-center hover:text-amber-500 transition-colors" 
               onClick={() => handleShare(message)}
